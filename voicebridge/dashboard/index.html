@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceBridge — Triage Supervisor Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red:    #dc2626;
+    --orange: #ea580c;
+    --yellow: #ca8a04;
+    --green:  #16a34a;
+    --blue:   #6b7280;
+    --bg:     #f8fafc;
+    --surface:#ffffff;
+    --border: #e2e8f0;
+    --text:   #1e293b;
+    --muted:  #64748b;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,.1);
+  }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { font-size: 16px; font-weight: 700; flex: 1; }
+  header h1 span { color: var(--muted); font-weight: 400; font-size: 13px; }
+  #refresh-status {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  #refresh-status .countdown { font-weight: 600; color: var(--text); }
+
+  /* ── Summary bar ─────────────────────────────────────────────── */
+  #summary-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .swatch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    min-width: 80px;
+  }
+  .swatch .count { font-size: 18px; line-height: 1; }
+  .swatch.red    { background: var(--red);    }
+  .swatch.orange { background: var(--orange); }
+  .swatch.yellow { background: var(--yellow); }
+  .swatch.green  { background: var(--green);  }
+  .swatch.blue   { background: var(--blue);   }
+
+  /* ── Records list ─────────────────────────────────────────────── */
+  #main {
+    padding: 12px 16px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  #records-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .record-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    box-shadow: var(--shadow);
+    display: grid;
+    grid-template-columns: 100px 1fr auto;
+    gap: 4px 12px;
+    align-items: start;
+    min-width: 0;
+  }
+  .record-card.level-red    { border-left-color: var(--red);    }
+  .record-card.level-orange { border-left-color: var(--orange); }
+  .record-card.level-yellow { border-left-color: var(--yellow); }
+  .record-card.level-green  { border-left-color: var(--green);  }
+  .record-card.level-blue   { border-left-color: var(--blue);   }
+
+  .level-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #fff;
+    display: inline-block;
+    white-space: nowrap;
+  }
+  .level-badge.red    { background: var(--red);    }
+  .level-badge.orange { background: var(--orange); }
+  .level-badge.yellow { background: var(--yellow); }
+  .level-badge.green  { background: var(--green);  }
+  .level-badge.blue   { background: var(--blue);   }
+
+  .record-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .record-pid   { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .record-ts    { font-size: 11px; color: var(--muted); }
+  .record-lang  { font-size: 11px; color: var(--muted); }
+
+  .record-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .record-complaint { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .record-flags     { font-size: 12px; color: var(--red); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .record-action    { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .record-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  .tews-badge {
+    font-size: 11px;
+    background: #f1f5f9;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--muted);
+  }
+  .conflict-badge {
+    font-size: 11px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--red);
+    font-weight: 600;
+  }
+  .referral-badge {
+    font-size: 11px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--orange);
+  }
+
+  /* ── Empty / error states ────────────────────────────────────── */
+  #status-msg {
+    text-align: center;
+    padding: 40px 16px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  #status-msg.error { color: var(--red); }
+
+  /* ── Scrollable list wrapper ─────────────────────────────────── */
+  #scroll-wrapper {
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>VoiceBridge <span>Triage Supervisor Dashboard</span></h1>
+  <div id="refresh-status">
+    Auto-refresh in <span class="countdown" id="countdown">30</span>s
+    &nbsp;·&nbsp;
+    <span id="last-updated">never</span>
+  </div>
+</header>
+
+<div id="summary-bar">
+  <div class="swatch red">    <span class="count" id="cnt-red">0</span>    RED</div>
+  <div class="swatch orange"> <span class="count" id="cnt-orange">0</span> ORANGE</div>
+  <div class="swatch yellow"> <span class="count" id="cnt-yellow">0</span> YELLOW</div>
+  <div class="swatch green">  <span class="count" id="cnt-green">0</span>  GREEN</div>
+  <div class="swatch blue">   <span class="count" id="cnt-blue">0</span>   BLUE</div>
+</div>
+
+<div id="main">
+  <div id="scroll-wrapper">
+    <div id="records-list">
+      <div id="status-msg">Loading records…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const API_URL      = "/records?limit=100";
+const REFRESH_SECS = 30;
+
+let countdownVal = REFRESH_SECS;
+let refreshTimer = null;
+let countdownTimer = null;
+
+// ── Fetch and render ─────────────────────────────────────────────
+
+async function fetchRecords() {
+  try {
+    const resp = await fetch(API_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+    const records = await resp.json();
+    renderRecords(records);
+    document.getElementById("last-updated").textContent =
+      "Updated " + new Date().toLocaleTimeString();
+  } catch (err) {
+    showError("Failed to load records: " + err.message);
+  }
+}
+
+// ── Rendering ────────────────────────────────────────────────────
+
+function renderRecords(records) {
+  const list = document.getElementById("records-list");
+
+  // Clear
+  list.innerHTML = "";
+
+  if (!records || records.length === 0) {
+    const msg = document.createElement("div");
+    msg.id = "status-msg";
+    msg.textContent = "No triage records found. Records appear here after /intake calls.";
+    list.appendChild(msg);
+    updateSummary([]);
+    return;
+  }
+
+  updateSummary(records);
+
+  records.forEach((rec, idx) => {
+    const card = buildCard(rec, idx);
+    list.appendChild(card);
+  });
+}
+
+function buildCard(rec, idx) {
+  const level = (rec.triage_level || "blue").toLowerCase();
+
+  const card = document.createElement("div");
+  card.className = `record-card level-${level}`;
+
+  // Left column
+  const left = document.createElement("div");
+  left.className = "record-left";
+
+  const badge = document.createElement("span");
+  badge.className = `level-badge ${level}`;
+  badge.textContent = level.toUpperCase();
+
+  const pid = document.createElement("div");
+  pid.className = "record-pid";
+  // record_id is not in the TriageOutput payload; show a sequence number
+  const recId = rec.record_id || ("#" + String(idx + 1).padStart(3, "0"));
+  pid.textContent = recId;
+  pid.title = recId;
+
+  const ts = document.createElement("div");
+  ts.className = "record-ts";
+  const timestamp = rec.created_at || rec.timestamp || "—";
+  ts.textContent = timestamp !== "—"
+    ? new Date(timestamp).toLocaleString()
+    : "—";
+
+  const lang = document.createElement("div");
+  lang.className = "record-lang";
+  lang.textContent = "Lang: " + (rec.source_language || "—").toUpperCase();
+
+  left.appendChild(badge);
+  left.appendChild(pid);
+  left.appendChild(ts);
+  left.appendChild(lang);
+
+  // Body column
+  const body = document.createElement("div");
+  body.className = "record-body";
+
+  const complaint = document.createElement("div");
+  complaint.className = "record-complaint";
+  complaint.textContent = rec.primary_complaint || "—";
+  complaint.title = rec.primary_complaint || "";
+
+  const flags = rec.red_flag_indicators || [];
+  if (flags.length > 0) {
+    const flagEl = document.createElement("div");
+    flagEl.className = "record-flags";
+    flagEl.textContent = "⚑ " + flags[0];
+    flagEl.title = flags.join(", ");
+    body.appendChild(complaint);
+    body.appendChild(flagEl);
+  } else {
+    body.appendChild(complaint);
+  }
+
+  const action = document.createElement("div");
+  action.className = "record-action";
+  action.textContent = rec.recommended_action || "";
+  action.title = rec.recommended_action || "";
+  body.appendChild(action);
+
+  // Right column
+  const right = document.createElement("div");
+  right.className = "record-right";
+
+  // TEWS score — not present in TriageOutput, show placeholder if available
+  if (rec.tews_score != null) {
+    const tews = document.createElement("span");
+    tews.className = "tews-badge";
+    tews.textContent = "TEWS " + rec.tews_score;
+    right.appendChild(tews);
+  }
+
+  // Conflict warning — validator_disagreed flag if present
+  if (rec.validator_disagreed || rec.conflict) {
+    const conflict = document.createElement("span");
+    conflict.className = "conflict-badge";
+    conflict.textContent = "⚠ Validator conflict";
+    right.appendChild(conflict);
+  }
+
+  // Referral flag
+  if (rec.referral_needed === true) {
+    const referral = document.createElement("span");
+    referral.className = "referral-badge";
+    referral.textContent = "Referral";
+    right.appendChild(referral);
+  }
+
+  card.appendChild(left);
+  card.appendChild(body);
+  card.appendChild(right);
+
+  return card;
+}
+
+// ── Summary bar ──────────────────────────────────────────────────
+
+function updateSummary(records) {
+  const counts = { red: 0, orange: 0, yellow: 0, green: 0, blue: 0 };
+  records.forEach(r => {
+    const lvl = (r.triage_level || "blue").toLowerCase();
+    if (counts[lvl] !== undefined) counts[lvl]++;
+  });
+  document.getElementById("cnt-red").textContent    = counts.red;
+  document.getElementById("cnt-orange").textContent = counts.orange;
+  document.getElementById("cnt-yellow").textContent = counts.yellow;
+  document.getElementById("cnt-green").textContent  = counts.green;
+  document.getElementById("cnt-blue").textContent   = counts.blue;
+}
+
+// ── Error display ─────────────────────────────────────────────────
+
+function showError(msg) {
+  const list = document.getElementById("records-list");
+  list.innerHTML = "";
+  const el = document.createElement("div");
+  el.id = "status-msg";
+  el.className = "error";
+  el.textContent = msg;
+  list.appendChild(el);
+}
+
+// ── Auto-refresh with countdown ───────────────────────────────────
+
+function startCountdown() {
+  countdownVal = REFRESH_SECS;
+  document.getElementById("countdown").textContent = countdownVal;
+
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    countdownVal--;
+    document.getElementById("countdown").textContent = Math.max(countdownVal, 0);
+    if (countdownVal <= 0) {
+      clearInterval(countdownTimer);
+    }
+  }, 1000);
+}
+
+function scheduleRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  startCountdown();
+  refreshTimer = setTimeout(async () => {
+    await fetchRecords();
+    scheduleRefresh();
+  }, REFRESH_SECS * 1000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+
+(async function init() {
+  await fetchRecords();
+  scheduleRefresh();
+})();
+</script>
+
+</body>
+</html>

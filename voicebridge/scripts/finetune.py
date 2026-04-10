@@ -46,15 +46,18 @@ DEFAULTS = dict(
     lora_rank         = 32,
     lora_alpha        = 64,
     lora_dropout      = 0.05,
-    target_modules    = ["q_proj", "k_proj", "v_proj", "o_proj"],
+    target_modules    = [
+        "q_proj", "k_proj", "v_proj", "o_proj",
+        "gate_proj", "up_proj", "down_proj",
+    ],
     # Training
-    epochs            = 4,
-    per_device_batch  = 4,
-    grad_accumulation = 2,      # effective batch size = 4 × 2 = 8
+    epochs            = 3,
+    per_device_batch  = 2,
+    grad_accumulation = 4,      # effective batch size = 2 × 4 = 8
     learning_rate     = 2e-4,
     lr_scheduler      = "cosine",
     warmup_ratio      = 0.05,
-    max_seq_length    = 4096,
+    max_seq_length    = 2048,
     log_steps         = 10,
     # Quantisation
     load_in_4bit      = True,
@@ -123,6 +126,8 @@ class JsonlLossLogger:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         # Truncate / create fresh log for this run
         self.log_path.write_text("")
+        self.best_loss = float("inf")
+        self.best_step = 0
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         """Called by HF Trainer on every logging event."""
@@ -131,13 +136,16 @@ class JsonlLossLogger:
         step = state.global_step
         if step % self.log_steps != 0:
             return
+        loss = logs.get("loss")
+        if loss is not None and loss < self.best_loss:
+            self.best_loss = loss
+            self.best_step = step
         entry = {
-            "step":      step,
-            "epoch":     round(state.epoch, 4) if state.epoch else None,
-            "loss":      logs.get("loss"),
-            "grad_norm": logs.get("grad_norm"),
-            "lr":        logs.get("learning_rate"),
-            "wall_time": time.time(),
+            "step":          step,
+            "epoch":         round(state.epoch, 4) if state.epoch else None,
+            "loss":          loss,
+            "learning_rate": logs.get("learning_rate"),
+            "timestamp":     time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
         with self.log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
@@ -222,9 +230,38 @@ def run_finetune(cfg: dict) -> None:
           f"({100 * trainable_params / total_params:.2f}% of {total_params:,})")
 
     # ── Prepare output directories ────────────────────────────────────────────
-    for p in [cfg["adapter_output"], cfg["merged_output"],
-              str(Path(cfg["log_path"]).parent)]:
+    runs_dir = Path(cfg["log_path"]).parent
+    for p in [cfg["adapter_output"], cfg["merged_output"], str(runs_dir)]:
         Path(p).mkdir(parents=True, exist_ok=True)
+
+    # ── Write run config snapshot ─────────────────────────────────────────────
+    run_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    finetune_config = {
+        "model_id":              cfg["model_id"],
+        "lora_rank":             cfg["lora_rank"],
+        "lora_alpha":            cfg["lora_alpha"],
+        "lora_dropout":          cfg["lora_dropout"],
+        "target_modules":        cfg["target_modules"],
+        "load_in_4bit":          cfg["load_in_4bit"],
+        "epochs":                cfg["epochs"],
+        "batch_size":            cfg["per_device_batch"],
+        "grad_accum":            cfg["grad_accumulation"],
+        "effective_batch_size":  cfg["per_device_batch"] * cfg["grad_accumulation"],
+        "learning_rate":         cfg["learning_rate"],
+        "lr_scheduler":          cfg["lr_scheduler"],
+        "max_seq_len":           cfg["max_seq_length"],
+        "optimizer":             "adamw_8bit",
+        "bf16":                  True,
+        "dataset_path":          cfg["dataset_path"],
+        "dataset_size":          len(raw_records),
+        "adapter_output_path":   cfg["adapter_output"],
+        "merged_output_path":    cfg["merged_output"],
+        "hardware_note":         "RTX 5090 32GB VRAM, CUDA 12.8, sm_120 (Blackwell)",
+        "run_timestamp":         run_timestamp,
+    }
+    config_json_path = runs_dir / "finetune_config.json"
+    config_json_path.write_text(json.dumps(finetune_config, indent=2))
+    print(f"  Run config saved → {config_json_path}")
 
     # ── Training arguments ────────────────────────────────────────────────────
     max_steps = -1
@@ -243,6 +280,7 @@ def run_finetune(cfg: dict) -> None:
         warmup_ratio                = cfg["warmup_ratio"],
         bf16                        = True,
         fp16                        = False,
+        gradient_checkpointing      = True,
         optim                       = "adamw_8bit",
         weight_decay                = 0.01,
         logging_steps               = cfg["log_steps"],
@@ -278,7 +316,7 @@ def run_finetune(cfg: dict) -> None:
           f"effective_batch={cfg['per_device_batch'] * cfg['grad_accumulation']}, "
           f"lr={cfg['learning_rate']}) …\n")
     t0 = time.time()
-    trainer.train()
+    train_result = trainer.train()
     elapsed = time.time() - t0
     print(f"\nTraining complete in {elapsed / 60:.1f} min")
 
@@ -301,8 +339,35 @@ def run_finetune(cfg: dict) -> None:
         print("  Merged model saved.")
     else:
         print("  [dry-run] Skipping merged model save.")
+        print("\n[dry-run] Testing inference on one example...")
+        FastLanguageModel.for_inference(model)
+        sample = formatted[0]["text"].split("<start_of_turn>model\n")[0]
+        sample += "<start_of_turn>model\n"
+        inputs = tokenizer(sample, return_tensors="pt").to("cuda")
+        outputs = model.generate(**inputs, max_new_tokens=256)
+        print(tokenizer.decode(outputs[0], skip_special_tokens=True)[-500:])
 
-    print(f"\nDone. Loss log → {cfg['log_path']}")
+    # ── Training summary ──────────────────────────────────────────────────────
+    final_loss = train_result.training_loss
+    best_loss  = loss_logger.best_loss
+    best_step  = loss_logger.best_step
+    h, rem     = divmod(int(elapsed), 3600)
+    m, s       = divmod(rem, 60)
+    elapsed_str = f"{h}h {m}m {s}s" if h else f"{m}m {s}s"
+
+    print("\n" + "=" * 64)
+    print("Training Summary")
+    print("=" * 64)
+    print(f"  Final training loss      : {final_loss:.4f}")
+    print(f"  Best loss achieved       : {best_loss:.4f}  (step {best_step})")
+    print(f"  Total training time      : {elapsed_str}")
+    print(f"  Trainable parameters     : {trainable_params:,}  "
+          f"({100 * trainable_params / total_params:.2f}% of {total_params:,})")
+    print(f"  Adapter saved            : {cfg['adapter_output']}")
+    if not cfg.get("dry_run"):
+        print(f"  Merged model saved       : {cfg['merged_output']}")
+    print(f"  Loss log                 : {cfg['log_path']}")
+    print("=" * 64)
 
 
 # ---------------------------------------------------------------------------
