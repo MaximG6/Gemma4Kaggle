@@ -1,0 +1,35 @@
+# VoiceBridge — Raspberry Pi 5 / edge deployment
+#
+# Runs the quantised GGUF model via llama-cpp-python's built-in HTTP server.
+# Build:
+#   docker build -f docker/Dockerfile.edge -t voicebridge-edge .
+# Run:
+#   docker run -p 8080:8080 -v $(pwd)/models:/models voicebridge-edge
+#
+# Expects models/voicebridge-q4km.gguf to exist (produced by scripts/quantise.sh)
+
+FROM python:3.11-slim
+
+# Build tools needed to compile llama-cpp-python from source
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cmake \
+        build-essential \
+        libopenblas-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install llama-cpp-python with its HTTP server extra
+RUN pip install --no-cache-dir "llama-cpp-python[server]"
+
+# Copy the quantised model into the image
+COPY models/voicebridge-q4km.gguf /models/voicebridge-q4km.gguf
+
+EXPOSE 8080
+
+# n_ctx=8192 — enough for the triage prompt + response
+# n_gpu_layers=0 — CPU-only on Pi 5 (no GPU)
+CMD ["python", "-m", "llama_cpp.server", \
+     "--model",         "/models/voicebridge-q4km.gguf", \
+     "--n_ctx",         "8192", \
+     "--n_gpu_layers",  "0", \
+     "--host",          "0.0.0.0", \
+     "--port",          "8080"]

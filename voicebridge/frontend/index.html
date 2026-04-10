@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoiceBridge — Clinical Intake</title>
+  <style>
+    :root {
+      --red:    #E24B4A;
+      --orange: #EF9F27;
+      --yellow: #EFD927;
+      --green:  #639922;
+      --blue:   #378ADD;
+      --bg:     #F4F6F8;
+      --card:   #FFFFFF;
+      --text:   #1A1A2E;
+      --sub:    #555;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+    header {
+      background: var(--text); color: #fff; padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 1.3rem; }
+    header span { font-size: 0.85rem; opacity: .7; }
+
+    #network-bar {
+      padding: 6px 24px; font-size: 0.82rem; font-weight: 600;
+      text-align: center; transition: background .3s;
+    }
+    #network-bar.online  { background: var(--green);  color: #fff; }
+    #network-bar.offline { background: var(--orange); color: #fff; }
+
+    main { max-width: 720px; margin: 28px auto; padding: 0 16px; }
+
+    .card {
+      background: var(--card); border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 24px; margin-bottom: 20px;
+    }
+    h2 { font-size: 1.05rem; margin-bottom: 14px; color: var(--text); }
+
+    .upload-area {
+      border: 2px dashed #ccc; border-radius: 8px; padding: 32px;
+      text-align: center; cursor: pointer; color: var(--sub);
+      transition: border-color .2s;
+    }
+    .upload-area:hover, .upload-area.drag { border-color: var(--blue); }
+    .upload-area input { display: none; }
+    .upload-area p { margin-top: 8px; font-size: 0.85rem; }
+
+    #mic-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--blue); color: #fff; border: none;
+      border-radius: 6px; padding: 10px 20px; font-size: 0.95rem;
+      cursor: pointer; margin-top: 12px; transition: background .2s;
+    }
+    #mic-btn.recording { background: var(--red); }
+    #mic-btn:disabled  { background: #aaa; cursor: default; }
+
+    #submit-btn {
+      display: block; width: 100%; padding: 12px;
+      background: var(--text); color: #fff; border: none;
+      border-radius: 8px; font-size: 1rem; cursor: pointer;
+      margin-top: 16px; transition: opacity .2s;
+    }
+    #submit-btn:disabled { opacity: .4; cursor: default; }
+
+    #result-section { display: none; }
+
+    .triage-banner {
+      border-radius: 8px; padding: 18px 20px; color: #fff;
+      font-size: 1.4rem; font-weight: 700; text-align: center;
+      margin-bottom: 16px;
+    }
+    .triage-banner.yellow { color: #333; }
+
+    .detail-grid {
+      display: grid; grid-template-columns: 160px 1fr; gap: 1px;
+      background: #eee; border: 1px solid #eee; border-radius: 6px; overflow: hidden;
+    }
+    .detail-grid .label {
+      background: #f5f5f5; padding: 8px 12px;
+      font-size: 0.85rem; font-weight: 600; color: var(--sub);
+    }
+    .detail-grid .value {
+      background: #fff; padding: 8px 12px; font-size: 0.88rem;
+    }
+
+    .red-flags { background: #fff5f5; border-left: 4px solid var(--red); padding: 10px 14px; border-radius: 4px; margin-top: 12px; }
+    .red-flags li { font-size: 0.87rem; margin: 4px 0 4px 16px; }
+
+    #pdf-btn {
+      display: inline-block; margin-top: 14px; padding: 10px 22px;
+      background: var(--green); color: #fff; border: none;
+      border-radius: 6px; font-size: 0.95rem; cursor: pointer;
+    }
+
+    #spinner { display: none; text-align: center; padding: 20px; color: var(--sub); }
+    #error-box { display: none; background: #fff0f0; border-left: 4px solid var(--red); padding: 12px 16px; border-radius: 4px; margin-top: 12px; font-size: 0.88rem; }
+
+    footer { text-align: center; padding: 24px; font-size: 0.78rem; color: var(--sub); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>VoiceBridge</h1>
+  <span>Offline Multilingual Clinical Intake AI</span>
+</header>
+
+<div id="network-bar" class="online">Online — using server model</div>
+
+<main>
+  <!-- Input card -->
+  <div class="card">
+    <h2>Patient Intake Audio</h2>
+
+    <div class="upload-area" id="drop-zone">
+      <input type="file" id="file-input" accept="audio/*" />
+      <div>&#127908; Drop audio file here or <u>click to browse</u></div>
+      <p>Accepts WAV, MP3, OGG, FLAC — any language</p>
+      <p id="file-name"></p>
+    </div>
+
+    <button id="mic-btn">&#9679; Start recording</button>
+    <p id="rec-timer" style="font-size:.82rem;color:var(--sub);margin-top:6px;"></p>
+
+    <button id="submit-btn" disabled>Run Triage</button>
+  </div>
+
+  <!-- Loading -->
+  <div id="spinner">&#9696; Running inference&hellip;</div>
+  <div id="error-box"></div>
+
+  <!-- Result card -->
+  <div class="card" id="result-section">
+    <h2>Triage Result</h2>
+    <div class="triage-banner" id="level-banner"></div>
+
+    <div class="detail-grid" id="detail-grid"></div>
+
+    <div class="red-flags" id="red-flags-section" style="display:none">
+      <strong>Red Flag Indicators</strong>
+      <ul id="red-flags-list"></ul>
+    </div>
+
+    <button id="pdf-btn">&#128196; Download PDF Form</button>
+  </div>
+</main>
+
+<footer>VoiceBridge &mdash; Gemma 4 Good Hackathon 2026 &bull; Decision-support only; clinical judgement must prevail.</footer>
+
+<script>
+// ────────────────────────────────────────────────────────────────────────────
+// Network status indicator
+// ────────────────────────────────────────────────────────────────────────────
+const netBar = document.getElementById('network-bar');
+function updateNet() {
+  if (navigator.onLine) {
+    netBar.className = 'online';
+    netBar.textContent = 'Online — using server model';
+  } else {
+    netBar.className = 'offline';
+    netBar.textContent = 'Offline — routing to local edge model (localhost:8080)';
+  }
+}
+window.addEventListener('online',  updateNet);
+window.addEventListener('offline', updateNet);
+updateNet();
+
+// ────────────────────────────────────────────────────────────────────────────
+// Service worker registration
+// ────────────────────────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/ui/sw.js').catch(console.warn);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// File upload
+// ────────────────────────────────────────────────────────────────────────────
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const fileName  = document.getElementById('file-name');
+const submitBtn = document.getElementById('submit-btn');
+let selectedFile = null;
+let recordingBlob = null;
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  selectedFile = fileInput.files[0];
+  recordingBlob = null;
+  fileName.textContent = selectedFile ? `Selected: ${selectedFile.name}` : '';
+  submitBtn.disabled = !selectedFile;
+});
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  selectedFile = e.dataTransfer.files[0];
+  recordingBlob = null;
+  fileName.textContent = selectedFile ? `Selected: ${selectedFile.name}` : '';
+  submitBtn.disabled = !selectedFile;
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Microphone recording
+// ────────────────────────────────────────────────────────────────────────────
+const micBtn   = document.getElementById('mic-btn');
+const recTimer = document.getElementById('rec-timer');
+let mediaRec = null, recChunks = [], recInterval = null, recSecs = 0;
+
+micBtn.addEventListener('click', async () => {
+  if (mediaRec && mediaRec.state === 'recording') {
+    mediaRec.stop();
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recChunks = []; recSecs = 0;
+    mediaRec = new MediaRecorder(stream);
+    mediaRec.ondataavailable = e => recChunks.push(e.data);
+    mediaRec.onstop = () => {
+      clearInterval(recInterval);
+      recTimer.textContent = '';
+      stream.getTracks().forEach(t => t.stop());
+      recordingBlob = new Blob(recChunks, { type: 'audio/webm' });
+      selectedFile = null;
+      fileName.textContent = `Recorded: ${recSecs}s of audio`;
+      submitBtn.disabled = false;
+      micBtn.className = '';
+      micBtn.textContent = '● Start recording';
+    };
+    mediaRec.start();
+    micBtn.className = 'recording';
+    micBtn.textContent = '■ Stop recording';
+    recInterval = setInterval(() => {
+      recSecs++;
+      recTimer.textContent = `Recording: ${recSecs}s`;
+    }, 1000);
+  } catch (err) {
+    showError('Microphone access denied: ' + err.message);
+  }
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Submit
+// ────────────────────────────────────────────────────────────────────────────
+const LEVEL_COLORS = { red: '#E24B4A', orange: '#EF9F27', yellow: '#EFD927', green: '#639922', blue: '#378ADD' };
+const LEVEL_WAIT   = {
+  red:    'IMMEDIATE — see within seconds',
+  orange: 'VERY URGENT — see within 10 minutes',
+  yellow: 'URGENT — see within 60 minutes',
+  green:  'ROUTINE — see within 4 hours',
+  blue:   'EXPECTANT — palliative care',
+};
+
+submitBtn.addEventListener('click', async () => {
+  const blob = recordingBlob || selectedFile;
+  if (!blob) return;
+
+  showSpinner(true);
+  hideError();
+  document.getElementById('result-section').style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('file', blob, selectedFile ? selectedFile.name : 'recording.webm');
+
+  try {
+    const resp = await fetch('/intake', { method: 'POST', body: fd });
+    if (!resp.ok) throw new Error(`Server error ${resp.status}`);
+    const data = await resp.json();
+    renderResult(data.triage);
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    showSpinner(false);
+  }
+});
+
+function renderResult(t) {
+  const banner = document.getElementById('level-banner');
+  banner.textContent = `${t.triage_level.toUpperCase()} — ${LEVEL_WAIT[t.triage_level]}`;
+  banner.style.background = LEVEL_COLORS[t.triage_level];
+  banner.className = 'triage-banner ' + t.triage_level;
+
+  const grid = document.getElementById('detail-grid');
+  grid.innerHTML = '';
+  const rows = [
+    ['Primary complaint', t.primary_complaint],
+    ['Symptoms',          (t.reported_symptoms || []).join(', ') || '—'],
+    ['Vital signs',       Object.entries(t.vital_signs_reported || {}).map(([k,v])=>`${k}: ${v}`).join(', ') || '—'],
+    ['Duration',          t.duration_of_symptoms],
+    ['Relevant history',  t.relevant_history || '—'],
+    ['Recommended action',t.recommended_action],
+    ['Referral needed',   t.referral_needed ? 'YES' : 'No'],
+    ['AI confidence',     Math.round(t.confidence_score * 100) + '%'],
+    ['Source language',   t.source_language],
+  ];
+  rows.forEach(([label, value]) => {
+    grid.insertAdjacentHTML('beforeend',
+      `<div class="label">${label}</div><div class="value">${value}</div>`);
+  });
+
+  const flags = t.red_flag_indicators || [];
+  const flagSec = document.getElementById('red-flags-section');
+  if (flags.length) {
+    flagSec.style.display = 'block';
+    document.getElementById('red-flags-list').innerHTML =
+      flags.map(f => `<li>${f}</li>`).join('');
+  } else {
+    flagSec.style.display = 'none';
+  }
+
+  document.getElementById('result-section').style.display = 'block';
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// PDF download
+// ────────────────────────────────────────────────────────────────────────────
+document.getElementById('pdf-btn').addEventListener('click', async () => {
+  const blob = recordingBlob || selectedFile;
+  if (!blob) return;
+  const fd = new FormData();
+  fd.append('file', blob, selectedFile ? selectedFile.name : 'recording.webm');
+  const resp = await fetch('/intake/pdf', { method: 'POST', body: fd });
+  if (!resp.ok) { showError('PDF generation failed'); return; }
+  const url = URL.createObjectURL(await resp.blob());
+  const a = document.createElement('a');
+  a.href = url; a.download = 'triage.pdf'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────────────────────────
+function showSpinner(on) { document.getElementById('spinner').style.display = on ? 'block' : 'none'; }
+function showError(msg)   { const b = document.getElementById('error-box'); b.textContent = '⚠ ' + msg; b.style.display = 'block'; }
+function hideError()      { document.getElementById('error-box').style.display = 'none'; }
+</script>
+</body>
+</html>

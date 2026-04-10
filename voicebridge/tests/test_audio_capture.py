@@ -13,7 +13,11 @@ from fastapi.testclient import TestClient
 from api.main import app
 from api.audio_capture import resample_to_16k
 
-client = TestClient(app)
+
+@pytest.fixture()
+def client():
+    with TestClient(app) as c:
+        yield c
 
 
 def _make_wav(num_samples: int, sample_rate: int) -> bytes:
@@ -32,15 +36,15 @@ class TestResampleTo16k:
         wav = _make_wav(16000, 16000)
         arr = resample_to_16k(wav)
         assert arr.dtype == np.float32
-        assert abs(len(arr) - 16000) <= 10  # allow tiny rounding
+        assert abs(len(arr) - 16000) <= 10
 
     def test_8k_upsampled_to_16k(self):
-        wav = _make_wav(8000, 8000)  # 1 second at 8 kHz
+        wav = _make_wav(8000, 8000)
         arr = resample_to_16k(wav)
         assert abs(len(arr) - 16000) <= 50
 
     def test_44100_downsampled_to_16k(self):
-        wav = _make_wav(44100, 44100)  # 1 second at 44.1 kHz
+        wav = _make_wav(44100, 44100)
         arr = resample_to_16k(wav)
         assert abs(len(arr) - 16000) <= 50
 
@@ -51,7 +55,7 @@ class TestResampleTo16k:
 
 
 class TestUploadEndpoint:
-    def test_upload_returns_duration(self):
+    def test_upload_returns_duration(self, client):
         wav = _make_wav(16000, 16000)  # 1 second
         resp = client.post(
             "/audio/upload",
@@ -63,7 +67,7 @@ class TestUploadEndpoint:
         assert data["samples"] > 0
         assert data["filename"] == "test.wav"
 
-    def test_upload_2_seconds(self):
+    def test_upload_2_seconds(self, client):
         wav = _make_wav(32000, 16000)  # 2 seconds
         resp = client.post(
             "/audio/upload",

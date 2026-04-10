@@ -10,7 +10,7 @@ complete 6-phase plan with all tasks, code samples, and timestamps.
 Always refer back to it when deciding what to build next.
 
 ## Current phase
-Phase 1 — Tasks 1.3 and 1.4 complete; ready for Phase 2
+Phase 2 complete — all 5 tasks done, 85 tests passing
 
 ## Stack
 - Python 3.11, FastAPI, uvicorn
@@ -28,4 +28,4 @@ Phase 1 — Tasks 1.3 and 1.4 complete; ready for Phase 2
 - Target latency under 8 seconds on Pi 5 for a 10-second audio clip
 
 ## Active task
-Phase 2 — Task 2.1 (Gemma 4 transcription wrapper)
+Phase 3 — Task 3.1 (SATS/ETAT clinical validation mapping)
