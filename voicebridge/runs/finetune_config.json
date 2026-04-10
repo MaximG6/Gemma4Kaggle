@@ -1,0 +1,31 @@
+{
+  "model_id": "google/gemma-4-e4b-it",
+  "lora_rank": 32,
+  "lora_alpha": 64,
+  "lora_dropout": 0.075,
+  "target_modules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ],
+  "load_in_4bit": true,
+  "epochs": 2,
+  "batch_size": 2,
+  "grad_accum": 4,
+  "effective_batch_size": 8,
+  "learning_rate": 0.0002,
+  "lr_scheduler": "cosine",
+  "max_seq_len": 2048,
+  "optimizer": "adamw_8bit",
+  "bf16": true,
+  "dataset_path": "/mnt/c/Users/Maxim/.openclaw/workspace/Gemma4Kaggle/voicebridge/data/finetune_train.jsonl",
+  "dataset_size": 500,
+  "adapter_output_path": "/mnt/c/Users/Maxim/.openclaw/workspace/Gemma4Kaggle/voicebridge/models/voicebridge-gemma4-triage-adapter",
+  "merged_output_path": "/home/maxim/models/voicebridge-merged",
+  "hardware_note": "RTX 5090 32GB VRAM, CUDA 12.8, sm_120 (Blackwell)",
+  "run_timestamp": "2026-04-10T23:26:34Z"
+}

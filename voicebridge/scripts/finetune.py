@@ -45,13 +45,13 @@ DEFAULTS = dict(
     # LoRA
     lora_rank         = 32,
     lora_alpha        = 64,
-    lora_dropout      = 0.05,
+    lora_dropout      = 0.075,
     target_modules    = [
         "q_proj", "k_proj", "v_proj", "o_proj",
         "gate_proj", "up_proj", "down_proj",
     ],
     # Training
-    epochs            = 3,
+    epochs            = 2,
     per_device_batch  = 2,
     grad_accumulation = 4,      # effective batch size = 2 × 4 = 8
     learning_rate     = 2e-4,
@@ -155,14 +155,40 @@ class JsonlLossLogger:
 # Main fine-tune routine
 # ---------------------------------------------------------------------------
 
+
+# ---------------------------------------------------------------------------
+# Per-print elapsed-time helper (module-level so all entry points can use it)
+# ---------------------------------------------------------------------------
+
+_t_ref = [time.time()]
+
+def _tick(msg: str, file=None) -> None:
+    """Print msg prefixed with [+Xs] elapsed since the last _tick call."""
+    now    = time.time()
+    delta  = now - _t_ref[0]
+    _t_ref[0] = now
+    prefix = f"[+{delta:6.1f}s] "
+    aligned = msg.replace("\n", "\n" + " " * len(prefix))
+    print(prefix + aligned, flush=True, **({"file": file} if file else {}))
+
+
 def run_finetune(cfg: dict) -> None:
     # ── Imports (deferred so CLI --help works without GPU) ──────────────────
+    _tick("[1/7] Importing torch + CUDA (may take 20–60s on first run) …")
     import torch
-    from datasets import Dataset
-    from transformers import TrainingArguments, TrainerCallback
+    _tick(f"      torch {torch.__version__}  "
+          f"CUDA available: {torch.cuda.is_available()}  "
+          f"Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
 
+    _tick("[2/7] Importing HuggingFace datasets + transformers …")
+    from datasets import Dataset
+    from transformers import TrainerCallback, DataCollatorForLanguageModeling
+    _tick("      done.")
+
+    _tick("[3/7] Importing Unsloth (may compile CUDA kernels on first run) …")
     try:
         from unsloth import FastLanguageModel
+        _tick("      unsloth imported.")
     except ImportError:
         print(
             "[ERROR] unsloth is not installed.\n"
@@ -172,8 +198,10 @@ def run_finetune(cfg: dict) -> None:
         )
         sys.exit(1)
 
+    _tick("[4/7] Importing trl …")
     try:
         from trl import SFTTrainer, SFTConfig
+        _tick("      trl imported.")
     except ImportError:
         print(
             "[ERROR] trl is not installed.\n"
@@ -188,19 +216,33 @@ def run_finetune(cfg: dict) -> None:
         print(f"[ERROR] Dataset not found: {dataset_path}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Loading dataset from {dataset_path} …")
+    _tick(f"\n[5/7] Loading dataset from {dataset_path} …")
     raw_records = load_jsonl(dataset_path)
     if cfg.get("dry_run"):
         raw_records = raw_records[:16]
-        print(f"  [dry-run] truncated to {len(raw_records)} records")
+        _tick(f"  [dry-run] truncated to {len(raw_records)} records")
     else:
-        print(f"  {len(raw_records)} records loaded")
+        _tick(f"  {len(raw_records)} records loaded")
 
-    formatted = [{"text": format_prompt(r)} for r in raw_records]
-    dataset   = Dataset.from_list(formatted)
+    # Store messages for later — dataset is built after tokenizer loads
+    # so we can apply the chat template with the real tokenizer.
+    formatted = [
+        {
+            "messages": [
+                {"role": "system",    "content": r.get("instruction", "")},
+                {"role": "user",      "content": r.get("input", "")},
+                {"role": "assistant", "content": r.get("output", "")},
+            ]
+        }
+        for r in raw_records
+    ]
 
     # ── Load base model via Unsloth ──────────────────────────────────────────
-    print(f"\nLoading {cfg['model_id']} via Unsloth …")
+    _tick(f"\n[6/7] Loading {cfg['model_id']} via Unsloth …\n"
+          f"      4-bit quant: {cfg['load_in_4bit']}  "
+          f"max_seq_length: {cfg['max_seq_length']}  dtype: bfloat16\n"
+          f"      (downloads ~9 GB on first run, then loads into VRAM — "
+          f"may take several minutes)")
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name     = cfg["model_id"],
         max_seq_length = cfg["max_seq_length"],
@@ -210,23 +252,73 @@ def run_finetune(cfg: dict) -> None:
         # explicitly allow the architecture so it doesn't fall back to eager.
         device_map     = "auto",
     )
+    _vram_gb = (torch.cuda.memory_allocated() / 1024**3
+                if torch.cuda.is_available() else 0.0)
+    _tick(f"      Model loaded.  VRAM used: {_vram_gb:.1f} GB")
+
+    # Apply chat template now that tokenizer is available, producing a plain
+    # "text" dataset — avoids the collator receiving raw "messages" dicts.
+    _tick(f"      Applying chat template to {len(formatted)} examples …")
+    dataset = Dataset.from_dict({
+        "text": [
+            tokenizer.apply_chat_template(
+                ex["messages"], tokenize=False, add_generation_prompt=False
+            )
+            for ex in formatted
+        ]
+    })
+    _tick(f"      Dataset ready  ({len(dataset)} examples)")
+
+    # Pre-tokenise so SFTTrainer receives input_ids/labels/attention_mask directly.
+    # This bypasses SFTTrainer's internal lazy tokenisation, which in trl 0.10+
+    # runs _remove_unused_columns on the raw dataset before tokenising — causing
+    # the "text" column to be dropped before it is ever processed.
+    _tick(f"      Pre-tokenising {len(dataset)} examples …")
+
+    def _tokenize_batch(batch):
+        enc = tokenizer(
+            text=batch["text"],          # keyword arg — Gemma4 processor has images first
+            truncation=True,
+            max_length=cfg["max_seq_length"],
+            padding=False,
+        )
+        enc["labels"] = [ids[:] for ids in enc["input_ids"]]
+        return enc
+
+    dataset = dataset.map(_tokenize_batch, batched=True, remove_columns=["text"])
+    _tick(f"      Pre-tokenised  ({len(dataset)} examples, "
+          f"columns: {dataset.column_names})")
+
+    # ── Train / eval split (90 / 10) ─────────────────────────────────────────
+    # Skip split in dry-run (too few examples to split meaningfully)
+    if not cfg.get("dry_run") and len(dataset) >= 20:
+        split       = dataset.train_test_split(test_size=0.1, seed=42)
+        train_data  = split["train"]
+        eval_data   = split["test"]
+        _tick(f"      Train/eval split: {len(train_data)} train / {len(eval_data)} eval")
+    else:
+        train_data = dataset
+        eval_data  = None
+        _tick(f"      No eval split (dry-run or too few examples).")
 
     # ── Attach LoRA adapter ──────────────────────────────────────────────────
-    print("\nAttaching LoRA adapter …")
+    _tick(f"      Attaching LoRA adapter "
+          f"(r={cfg['lora_rank']}, α={cfg['lora_alpha']}, "
+          f"modules={len(cfg['target_modules'])}) …")
     model = FastLanguageModel.get_peft_model(
         model,
-        r                  = cfg["lora_rank"],
-        lora_alpha         = cfg["lora_alpha"],
-        lora_dropout       = cfg["lora_dropout"],
-        target_modules     = cfg["target_modules"],
-        bias               = "none",
-        use_gradient_checkpointing = "unsloth",   # Unsloth optimised checkpointing
-        random_state       = 42,
+        r                          = cfg["lora_rank"],
+        lora_alpha                 = cfg["lora_alpha"],
+        lora_dropout               = cfg["lora_dropout"],
+        target_modules             = cfg["target_modules"],
+        bias                       = "none",
+        use_gradient_checkpointing = "unsloth",
+        random_state               = 42,
     )
 
     total_params     = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"  Trainable params : {trainable_params:,}  "
+    _tick(f"      Trainable params: {trainable_params:,}  "
           f"({100 * trainable_params / total_params:.2f}% of {total_params:,})")
 
     # ── Prepare output directories ────────────────────────────────────────────
@@ -261,13 +353,13 @@ def run_finetune(cfg: dict) -> None:
     }
     config_json_path = runs_dir / "finetune_config.json"
     config_json_path.write_text(json.dumps(finetune_config, indent=2))
-    print(f"  Run config saved → {config_json_path}")
+    _tick(f"  Run config saved → {config_json_path}")
 
     # ── Training arguments ────────────────────────────────────────────────────
     max_steps = -1
     if cfg.get("dry_run"):
         max_steps = 10
-        print("  [dry-run] max_steps = 10")
+        _tick("  [dry-run] max_steps = 10")
 
     training_args = SFTConfig(
         output_dir                  = cfg["adapter_output"],
@@ -286,49 +378,64 @@ def run_finetune(cfg: dict) -> None:
         logging_steps               = cfg["log_steps"],
         save_strategy               = "epoch",
         save_total_limit            = 2,
-        report_to                   = "none",      # no wandb/tensorboard required
+        eval_strategy               = "epoch" if eval_data is not None else "no",
+        load_best_model_at_end      = eval_data is not None,
+        metric_for_best_model       = "eval_loss",
+        greater_is_better           = False,
+        report_to                   = "none",
         seed                        = 42,
-        max_seq_length              = cfg["max_seq_length"],
-        dataset_text_field          = "text",
-        packing                     = False,        # keep samples independent
+        dataset_text_field          = None,   # dataset is already tokenised
+        packing                     = False,
     )
 
     # ── Loss logger callback ─────────────────────────────────────────────────
     loss_logger = JsonlLossLogger(cfg["log_path"], cfg["log_steps"])
 
-    # Wrap as a HF TrainerCallback
     class _LossCallback(TrainerCallback):
         def on_log(self, args, state, control, logs=None, **kwargs):
             loss_logger.on_log(args, state, control, logs=logs, **kwargs)
 
     # ── SFTTrainer ────────────────────────────────────────────────────────────
-    print("\nInitialising SFTTrainer …")
+    _tick(f"\n[7/7] Initialising SFTTrainer …\n"
+          f"      Tokenising {len(dataset)} examples "
+          f"(max_seq_length={cfg['max_seq_length']}) — may take 1–2 min …")
+
     trainer = SFTTrainer(
         model          = model,
         tokenizer      = tokenizer,
-        train_dataset  = dataset,
+        train_dataset  = train_data,
+        eval_dataset   = eval_data,
+        data_collator  = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
         args           = training_args,
         callbacks      = [_LossCallback()],
     )
+    _tick(f"      SFTTrainer ready.  "
+          f"{len(trainer.train_dataset)} training examples"
+          + (f" / {len(eval_data)} eval examples." if eval_data else "."))
 
     # ── Train ─────────────────────────────────────────────────────────────────
-    print(f"\nStarting training  (epochs={cfg['epochs']}, "
-          f"effective_batch={cfg['per_device_batch'] * cfg['grad_accumulation']}, "
-          f"lr={cfg['learning_rate']}) …\n")
+    _eff_batch   = cfg["per_device_batch"] * cfg["grad_accumulation"]
+    _total_steps = (len(trainer.train_dataset) // _eff_batch) * cfg["epochs"]
+    _tick(f"\nStarting training …\n"
+          f"  epochs={cfg['epochs']}  effective_batch={_eff_batch}  "
+          f"lr={cfg['learning_rate']}  est. steps≈{_total_steps}\n"
+          f"  Loss logged every {cfg['log_steps']} steps → {cfg['log_path']}\n"
+          f"  (HF Trainer progress bar below)\n")
     t0 = time.time()
     train_result = trainer.train()
     elapsed = time.time() - t0
-    print(f"\nTraining complete in {elapsed / 60:.1f} min")
+    _tick(f"\nTraining complete in {elapsed / 60:.1f} min")
 
     # ── Save LoRA adapter ─────────────────────────────────────────────────────
-    print(f"\nSaving LoRA adapter → {cfg['adapter_output']}")
+    _tick(f"\nSaving LoRA adapter → {cfg['adapter_output']}")
     model.save_pretrained(cfg["adapter_output"])
     tokenizer.save_pretrained(cfg["adapter_output"])
+    _tick("  Adapter saved.")
 
     # ── Save merged (adapter + base weights fused) ─────────────────────────
     if not cfg.get("dry_run"):
-        print(f"Saving merged model → {cfg['merged_output']}")
-        print("  (this requires loading base weights in fp16; may take several minutes)")
+        _tick(f"\nSaving merged model → {cfg['merged_output']}\n"
+              f"  (fusing LoRA weights into base — may take several minutes)")
         merged_model = model.merge_and_unload()
         merged_model.save_pretrained(
             cfg["merged_output"],
@@ -336,38 +443,41 @@ def run_finetune(cfg: dict) -> None:
             max_shard_size="4GB",
         )
         tokenizer.save_pretrained(cfg["merged_output"])
-        print("  Merged model saved.")
+        _tick("  Merged model saved.")
     else:
-        print("  [dry-run] Skipping merged model save.")
-        print("\n[dry-run] Testing inference on one example...")
+        _tick("  [dry-run] Skipping merged model save.")
+        _tick("\n[dry-run] Testing inference on one example...")
         FastLanguageModel.for_inference(model)
-        sample = formatted[0]["text"].split("<start_of_turn>model\n")[0]
-        sample += "<start_of_turn>model\n"
-        inputs = tokenizer(sample, return_tensors="pt").to("cuda")
+        # Build prompt from messages (system + user only — no assistant turn)
+        _msgs  = formatted[0]["messages"][:2]
+        sample = tokenizer.apply_chat_template(
+            _msgs, tokenize=False, add_generation_prompt=True
+        )
+        inputs  = tokenizer(text=sample, return_tensors="pt").to("cuda")
         outputs = model.generate(**inputs, max_new_tokens=256)
-        print(tokenizer.decode(outputs[0], skip_special_tokens=True)[-500:])
+        _tick(tokenizer.decode(outputs[0], skip_special_tokens=True)[-500:])
 
     # ── Training summary ──────────────────────────────────────────────────────
-    final_loss = train_result.training_loss
-    best_loss  = loss_logger.best_loss
-    best_step  = loss_logger.best_step
-    h, rem     = divmod(int(elapsed), 3600)
-    m, s       = divmod(rem, 60)
+    final_loss  = train_result.training_loss
+    best_loss   = loss_logger.best_loss
+    best_step   = loss_logger.best_step
+    h, rem      = divmod(int(elapsed), 3600)
+    m, s        = divmod(rem, 60)
     elapsed_str = f"{h}h {m}m {s}s" if h else f"{m}m {s}s"
 
-    print("\n" + "=" * 64)
-    print("Training Summary")
-    print("=" * 64)
-    print(f"  Final training loss      : {final_loss:.4f}")
-    print(f"  Best loss achieved       : {best_loss:.4f}  (step {best_step})")
-    print(f"  Total training time      : {elapsed_str}")
-    print(f"  Trainable parameters     : {trainable_params:,}  "
-          f"({100 * trainable_params / total_params:.2f}% of {total_params:,})")
-    print(f"  Adapter saved            : {cfg['adapter_output']}")
-    if not cfg.get("dry_run"):
-        print(f"  Merged model saved       : {cfg['merged_output']}")
-    print(f"  Loss log                 : {cfg['log_path']}")
-    print("=" * 64)
+    _tick("\n" + "=" * 64 + "\n"
+          "Training Summary\n"
+          + "=" * 64 + "\n"
+          f"  Final training loss      : {final_loss:.4f}\n"
+          f"  Best loss achieved       : {best_loss:.4f}  (step {best_step})\n"
+          f"  Total training time      : {elapsed_str}\n"
+          f"  Trainable parameters     : {trainable_params:,}  "
+          f"({100 * trainable_params / total_params:.2f}% of {total_params:,})\n"
+          f"  Adapter saved            : {cfg['adapter_output']}"
+          + (f"\n  Merged model saved       : {cfg['merged_output']}"
+             if not cfg.get("dry_run") else "") + "\n"
+          f"  Loss log                 : {cfg['log_path']}\n"
+          + "=" * 64)
 
 
 # ---------------------------------------------------------------------------
@@ -393,6 +503,8 @@ def parse_args() -> dict:
     parser.add_argument("--log-steps",         type=int,   default=DEFAULTS["log_steps"])
     parser.add_argument("--dry-run",           action="store_true",
                         help="Run 10 steps on 16 examples to validate the setup")
+    parser.add_argument("--merge-only",        action="store_true",
+                        help="Skip training — load saved adapter and merge into base model")
     args = parser.parse_args()
 
     return dict(
@@ -415,7 +527,47 @@ def parse_args() -> dict:
         load_in_4bit      = DEFAULTS["load_in_4bit"],
         log_steps         = args.log_steps,
         dry_run           = args.dry_run,
+        merge_only        = args.merge_only,
     )
+
+
+# ---------------------------------------------------------------------------
+# Merge-only path (--merge-only)
+# ---------------------------------------------------------------------------
+
+def run_merge_only(cfg: dict) -> None:
+    """Load base model + saved LoRA adapter, fuse weights, save merged model."""
+    from unsloth import FastLanguageModel
+
+    adapter_path = cfg["adapter_output"]
+    merged_path  = cfg["merged_output"]
+
+    if not Path(adapter_path).exists():
+        print(f"[ERROR] Adapter not found at {adapter_path}", flush=True)
+        sys.exit(1)
+
+    print(f"  Adapter  : {adapter_path}", flush=True)
+    print(f"  Merged → : {merged_path}", flush=True)
+    print("=" * 64, flush=True)
+
+    _tick("Loading base model + adapter …")
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name     = adapter_path,   # loads base + applies adapter
+        max_seq_length = cfg["max_seq_length"],
+        load_in_4bit   = cfg["load_in_4bit"],
+    )
+    _tick("  Model loaded.")
+
+    _tick(f"\nFusing LoRA weights → {merged_path}\n"
+          f"  (may take several minutes)")
+    merged_model = model.merge_and_unload()
+    merged_model.save_pretrained(
+        merged_path,
+        safe_serialization = True,
+        max_shard_size     = "4GB",
+    )
+    tokenizer.save_pretrained(merged_path)
+    _tick("  Merged model saved.")
 
 
 if __name__ == "__main__":
@@ -438,6 +590,11 @@ if __name__ == "__main__":
     print(f"  Loss log→ {cfg['log_path']}")
     if cfg.get("dry_run"):
         print("  MODE           : DRY RUN (10 steps)")
+    if cfg.get("merge_only"):
+        print("  MODE           : MERGE ONLY (no training)")
     print("=" * 64)
 
-    run_finetune(cfg)
+    if cfg.get("merge_only"):
+        run_merge_only(cfg)
+    else:
+        run_finetune(cfg)
