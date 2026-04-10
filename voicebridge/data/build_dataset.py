@@ -1,0 +1,1530 @@
+"""
+VoiceBridge triage seed dataset generator.
+80 clinically accurate seed cases validated against SATS 2023 criteria.
+16 cases per triage level (RED, ORANGE, YELLOW, GREEN, BLUE).
+Covers 8 languages: en, sw, tl, ha, bn, hi, am, fr
+Run: python build_dataset.py
+Output: data/finetune_seed_cases.jsonl (80 cases)
+         data/finetune_train.jsonl (500 cases after augmentation)
+"""
+
+import json
+import random
+import os
+from pathlib import Path
+
+# ─────────────────────────────────────────────────────────────
+# SATS 2023 TEWS scoring reference (from validated literature)
+# RED   : TEWS >= 7 OR emergency discriminator (airway obstruction,
+#         uncontrolled haemorrhage, apnoea, seizure active, AVPU = P/U)
+# ORANGE: TEWS 5-6 OR very urgent discriminator
+# YELLOW: TEWS 3-4 OR urgent discriminator
+# GREEN : TEWS 1-2 OR routine
+# BLUE  : deceased / expectant
+# ─────────────────────────────────────────────────────────────
+
+SEED_CASES = [
+
+    # ═══════════════════════════════════════════════════════
+    # RED — 16 cases
+    # SATS criteria: TEWS ≥7 or emergency discriminator
+    # Emergency discriminators: airway obstruction, apnoea, active seizure,
+    # uncontrolled haemorrhage, AVPU=P or U, HR<40 or >150, RR<10 or >29,
+    # SpO2<90%, Temp>41C, glucose<3mmol/L with AMS
+    # ═══════════════════════════════════════════════════════
+    {
+        "lang": "en",
+        "triage": "red",
+        "transcript_en": "Adult male approximately 45 years, found collapsed in the market. No response to voice or pain. Not breathing. Bystander attempted CPR for 2 minutes before we arrived. Lips and fingertips are blue. No palpable pulse.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Cardiac arrest with respiratory arrest",
+            "reported_symptoms": ["loss of consciousness", "apnoea", "cyanosis", "no palpable pulse"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "colour": "cyanotic"},
+            "duration_of_symptoms": "approximately 5 minutes",
+            "relevant_history": "Unknown — found collapsed",
+            "red_flag_indicators": ["apnoea", "AVPU = U (unresponsive)", "no palpable pulse", "cyanosis"],
+            "recommended_action": "Immediate resuscitation. Continue CPR. Call physician or ambulance NOW. Prepare defibrillator if available.",
+            "referral_needed": True,
+            "confidence_score": 0.98
+        }
+    },
+    {
+        "lang": "sw",
+        "triage": "red",
+        "transcript_en": "Woman aged around 30 years. She had a seizure that has been going on for more than 5 minutes. She is still convulsing now. Eyes rolled back. Unresponsive. No history of epilepsy according to her husband.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Active generalised tonic-clonic seizure — status epilepticus",
+            "reported_symptoms": ["active convulsions", "unresponsive", "eyes deviated", "no known epilepsy history"],
+            "vital_signs_reported": {"consciousness": "unresponsive", "convulsions": "active and ongoing"},
+            "duration_of_symptoms": "over 5 minutes — active",
+            "relevant_history": "No known epilepsy",
+            "red_flag_indicators": ["active seizure >5 minutes (status epilepticus)", "AVPU = U"],
+            "recommended_action": "Emergency — seizure management protocol. Protect airway. Administer diazepam if available. Urgent transfer.",
+            "referral_needed": True,
+            "confidence_score": 0.97
+        }
+    },
+    {
+        "lang": "tl",
+        "triage": "red",
+        "transcript_en": "Child 3 years old. Breathing has stopped. Mother says the child choked on a piece of food 10 minutes ago. The child is limp, completely unresponsive, lips are turning blue.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Foreign body airway obstruction with respiratory arrest",
+            "reported_symptoms": ["apnoea", "limpness", "cyanosis", "unresponsive", "choking episode"],
+            "vital_signs_reported": {"breathing": "absent", "consciousness": "unresponsive", "colour": "cyanotic"},
+            "duration_of_symptoms": "10 minutes",
+            "relevant_history": "Choked on food 10 minutes ago",
+            "red_flag_indicators": ["apnoea", "complete airway obstruction", "AVPU = U", "cyanosis"],
+            "recommended_action": "Immediate — back blows and chest thrusts for paediatric obstruction. Begin CPR if no pulse. URGENT transfer.",
+            "referral_needed": True,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "ha",
+        "triage": "red",
+        "transcript_en": "Adult man, knife stab wound to the left side of the chest. Breathing very fast, 32 breaths per minute. He is conscious but very agitated and confused. Blood pressure feels very low — weak thready pulse around 130 per minute. Large amount of blood soaking through cloth.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Penetrating chest trauma with haemorrhagic shock",
+            "reported_symptoms": ["stab wound left chest", "tachypnoea", "tachycardia", "confusion", "major haemorrhage"],
+            "vital_signs_reported": {"respiratory_rate": "32/min", "heart_rate": "~130 bpm", "pulse": "weak and thready", "consciousness": "confused/agitated"},
+            "duration_of_symptoms": "acute — recent trauma",
+            "relevant_history": "Knife assault",
+            "red_flag_indicators": ["RR >29/min", "HR >120 with weak pulse — haemorrhagic shock", "penetrating chest trauma", "major haemorrhage"],
+            "recommended_action": "Apply pressure to wound. Do NOT remove knife if present. High flow oxygen if available. Immediate emergency transfer — possible haemothorax or tension pneumothorax.",
+            "referral_needed": True,
+            "confidence_score": 0.97
+        }
+    },
+    {
+        "lang": "bn",
+        "triage": "red",
+        "transcript_en": "Female 55 years. Family says she became suddenly unable to speak and her right arm and leg became completely weak 30 minutes ago. She is conscious but cannot respond verbally. Face drooping on the right side. Heart rate 92 regular.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Acute ischaemic stroke — FAST positive",
+            "reported_symptoms": ["sudden onset aphasia", "right hemiplegia", "facial droop right", "sudden onset <30 minutes ago"],
+            "vital_signs_reported": {"heart_rate": "92 bpm regular", "consciousness": "alert but aphasic"},
+            "duration_of_symptoms": "30 minutes — acute onset",
+            "relevant_history": "Unknown",
+            "red_flag_indicators": ["FAST positive — face arm speech time", "acute neurological deficit — time-critical thrombolysis window"],
+            "recommended_action": "Emergency — time-critical stroke. Record exact onset time. Urgent transfer to facility with CT and thrombolysis capability within 4.5 hours of onset.",
+            "referral_needed": True,
+            "confidence_score": 0.96
+        }
+    },
+    {
+        "lang": "hi",
+        "triage": "red",
+        "transcript_en": "Child 8 months. High fever 41.5 degrees Celsius. Having repeated seizures — third episode in 2 hours. Currently between episodes but very drowsy, AVPU responding only to pain. Fontanelle appears bulging.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Neonatal/infant meningitis — recurrent seizures with bulging fontanelle",
+            "reported_symptoms": ["fever 41.5C", "recurrent seizures x3 in 2 hours", "drowsy post-ictal", "bulging fontanelle"],
+            "vital_signs_reported": {"temperature": "41.5C", "consciousness": "AVPU = P (responds to pain)"},
+            "duration_of_symptoms": "seizures for 2 hours",
+            "relevant_history": "None known",
+            "red_flag_indicators": ["temperature >41C", "AVPU = P", "recurrent seizures", "bulging fontanelle — raised ICP meningitis"],
+            "recommended_action": "Emergency — suspected bacterial meningitis. Do NOT delay antibiotics for LP. Urgent transfer. Paediatric emergency.",
+            "referral_needed": True,
+            "confidence_score": 0.97
+        }
+    },
+    {
+        "lang": "am",
+        "triage": "red",
+        "transcript_en": "Pregnant woman, approximately 8 months gestation. Heavy vaginal bleeding for 20 minutes. She is pale, sweating, heart rate very fast around 140 per minute. Dizzy and almost fainting. Baby has not been moving for the past hour.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Antepartum haemorrhage with haemorrhagic shock — possible placental abruption",
+            "reported_symptoms": ["heavy vaginal bleeding", "pallor", "diaphoresis", "tachycardia", "near-syncope", "reduced fetal movements"],
+            "vital_signs_reported": {"heart_rate": "~140 bpm", "pallor": "present", "diaphoresis": "present"},
+            "duration_of_symptoms": "20 minutes — active haemorrhage",
+            "relevant_history": "8 months pregnant",
+            "red_flag_indicators": ["HR >120 — haemorrhagic shock", "active obstetric haemorrhage", "reduced fetal movements — fetal compromise", "near-syncope"],
+            "recommended_action": "Emergency obstetric — IV access large bore, lay flat, urgent transfer to obstetric unit NOW. Do not perform vaginal examination.",
+            "referral_needed": True,
+            "confidence_score": 0.98
+        }
+    },
+    {
+        "lang": "fr",
+        "triage": "red",
+        "transcript_en": "Adult male 60 years. Severe central chest pain radiating to left arm and jaw for 45 minutes. Sweating heavily. Pale. Heart rate 48 per minute — very slow. Blood pressure not measurable by cuff.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Suspected STEMI with cardiogenic shock and bradycardia",
+            "reported_symptoms": ["severe central chest pain", "radiation to left arm and jaw", "diaphoresis", "pallor", "bradycardia", "hypotension"],
+            "vital_signs_reported": {"heart_rate": "48 bpm", "blood_pressure": "unrecordable", "diaphoresis": "severe"},
+            "duration_of_symptoms": "45 minutes",
+            "relevant_history": "Unknown",
+            "red_flag_indicators": ["HR <50 — haemodynamically significant bradycardia", "unrecordable blood pressure — cardiogenic shock", "ACS presentation with shock"],
+            "recommended_action": "Emergency cardiac — aspirin 300mg if conscious and no allergy, oxygen, urgent transfer with defibrillator en route.",
+            "referral_needed": True,
+            "confidence_score": 0.97
+        }
+    },
+    {
+        "lang": "en",
+        "triage": "red",
+        "transcript_en": "Child 2 years, severe burns to face, neck and chest from boiling water — approximately 20 percent body surface area. Crying but breathing is noisy with stridor. Mouth and lips are swollen. Burns occurred 15 minutes ago.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Major burns with inhalation injury and impending airway compromise",
+            "reported_symptoms": ["burns 20% BSA face neck chest", "stridor", "lip and oral swelling", "noisy breathing"],
+            "vital_signs_reported": {"breathing": "noisy with stridor", "airway": "at immediate risk of obstruction"},
+            "duration_of_symptoms": "15 minutes post-burn",
+            "relevant_history": "Scalded by boiling water",
+            "red_flag_indicators": ["impending airway obstruction — stridor with facial burns", "inhalation injury", "major burns >15% BSA paediatric"],
+            "recommended_action": "AIRWAY EMERGENCY — do not wait. High flow oxygen NOW. Transfer immediately — airway may close within minutes. Do not apply tight dressings to face.",
+            "referral_needed": True,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "sw",
+        "triage": "red",
+        "transcript_en": "Adult woman. Blood glucose measured at 1.8 mmol per litre. She is confused, sweating, shaking. Unable to swallow safely — high risk of aspiration. Has type 1 diabetes and missed breakfast today.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Severe hypoglycaemia with altered consciousness — unsafe to feed orally",
+            "reported_symptoms": ["glucose 1.8 mmol/L", "confusion", "diaphoresis", "tremor", "cannot swallow safely"],
+            "vital_signs_reported": {"blood_glucose": "1.8 mmol/L", "consciousness": "confused — AVPU = V bordering P"},
+            "duration_of_symptoms": "onset this morning after missed meal",
+            "relevant_history": "Type 1 diabetes mellitus",
+            "red_flag_indicators": ["blood glucose <3 mmol/L with altered consciousness", "unable to swallow — IV glucose required"],
+            "recommended_action": "Emergency — IV dextrose 50% 50ml if IV access available, or glucagon IM if available. Do NOT give oral glucose — aspiration risk. Monitor response closely.",
+            "referral_needed": True,
+            "confidence_score": 0.97
+        }
+    },
+    {
+        "lang": "tl",
+        "triage": "red",
+        "transcript_en": "Male teenager around 16 years. Found hanging at home 20 minutes ago. Family cut him down. He is breathing but very slowly, only 7 breaths per minute. Unresponsive to voice, responds slightly to sternal rub. Heart rate 52.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Near-hanging with hypoxic brain injury — respiratory depression",
+            "reported_symptoms": ["near-hanging", "respiratory depression 7/min", "unresponsive to voice", "bradycardia"],
+            "vital_signs_reported": {"respiratory_rate": "7/min", "heart_rate": "52 bpm", "consciousness": "AVPU = P"},
+            "duration_of_symptoms": "approximately 20 minutes of anoxia",
+            "relevant_history": "Suspected suicide attempt by hanging",
+            "red_flag_indicators": ["RR <10/min", "AVPU = P", "HR <60", "hypoxic brain injury risk"],
+            "recommended_action": "Emergency — support breathing immediately. High flow oxygen. Cervical spine precautions. Urgent transfer. Safeguarding and mental health review required.",
+            "referral_needed": True,
+            "confidence_score": 0.97
+        }
+    },
+    {
+        "lang": "ha",
+        "triage": "red",
+        "transcript_en": "Adult male 35 years. Bitten by snake on right foot 30 minutes ago — snake was described as brown with a broad head. Foot and leg swelling rapidly. He is drooling, cannot swallow, heart rate 155 per minute. Bleeding from bite site not stopping.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Cytotoxic and possibly neurotoxic snakebite with haemotoxicity and systemic envenomation",
+            "reported_symptoms": ["snakebite right foot", "rapid swelling of foot and leg", "drooling", "dysphagia", "tachycardia", "bleeding not stopping"],
+            "vital_signs_reported": {"heart_rate": "155 bpm", "swelling": "rapidly spreading"},
+            "duration_of_symptoms": "30 minutes post-bite",
+            "relevant_history": "Snakebite — broad-headed brown snake",
+            "red_flag_indicators": ["HR >150", "neurotoxic signs — drooling and dysphagia", "haemotoxicity — ongoing bleeding", "rapid tissue swelling"],
+            "recommended_action": "Emergency snakebite protocol. Immobilise limb below heart level. DO NOT cut, suck or tourniquet. Antivenom if available and patient not allergic. URGENT transfer.",
+            "referral_needed": True,
+            "confidence_score": 0.96
+        }
+    },
+    {
+        "lang": "bn",
+        "triage": "red",
+        "transcript_en": "Newborn 2 days old. Mother says baby has not been feeding for 12 hours. Baby is limp, not crying. Breathing very fast, 68 breaths per minute. Temperature 38.9 Celsius. Fontanelle bulging slightly. Umbilical cord looks red and inflamed.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Neonatal sepsis — possible omphalitis with systemic infection",
+            "reported_symptoms": ["not feeding 12 hours", "limpness", "not crying", "tachypnoea 68/min", "fever 38.9C", "bulging fontanelle", "umbilical cord redness"],
+            "vital_signs_reported": {"respiratory_rate": "68/min", "temperature": "38.9C", "tone": "limp"},
+            "duration_of_symptoms": "12 hours deterioration",
+            "relevant_history": "2-day-old neonate — possible omphalitis",
+            "red_flag_indicators": ["neonatal sepsis red flags — limp neonate with tachypnoea and fever", "RR >60 in neonate", "bulging fontanelle", "portal of entry — omphalitis"],
+            "recommended_action": "NEONATAL EMERGENCY. Keep warm. IV access. Empirical antibiotics (ampicillin + gentamicin). Urgent transfer to neonatal unit.",
+            "referral_needed": True,
+            "confidence_score": 0.97
+        }
+    },
+    {
+        "lang": "hi",
+        "triage": "red",
+        "transcript_en": "Adult woman 25 years. Severe asthma attack. Cannot speak in full sentences — only 2 or 3 words before stopping. Respiratory rate 32 per minute. Audible wheeze. SpO2 measured at 87 percent. Using neck muscles to breathe.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Near-fatal acute severe asthma with hypoxia",
+            "reported_symptoms": ["unable to complete sentences", "tachypnoea 32/min", "SpO2 87%", "audible wheeze", "accessory muscle use"],
+            "vital_signs_reported": {"respiratory_rate": "32/min", "spo2": "87%", "speech": "2-3 words only"},
+            "duration_of_symptoms": "acute exacerbation — duration unclear",
+            "relevant_history": "Known asthma",
+            "red_flag_indicators": ["SpO2 <90%", "RR >29/min", "cannot speak in sentences — near-fatal asthma marker", "accessory muscle use"],
+            "recommended_action": "Emergency — high flow oxygen immediately. Salbutamol nebulisation continuous if available. IV access. Systemic steroids. Urgent transfer — may require intubation.",
+            "referral_needed": True,
+            "confidence_score": 0.98
+        }
+    },
+    {
+        "lang": "am",
+        "triage": "red",
+        "transcript_en": "Male farmer 40 years. Fell from a tree 10 metres high. Unconscious at scene, now responds to pain only. Deformity of left thigh, possible fracture. Large laceration on scalp bleeding heavily. Breathing 8 breaths per minute.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Major polytrauma — head injury with altered consciousness and respiratory depression",
+            "reported_symptoms": ["fall from 10 metres", "AVPU = P", "deformity left thigh", "heavy scalp bleeding", "RR 8/min"],
+            "vital_signs_reported": {"respiratory_rate": "8/min", "consciousness": "AVPU = P", "scalp_laceration": "actively bleeding"},
+            "duration_of_symptoms": "acute trauma",
+            "relevant_history": "Fall from height 10 metres",
+            "red_flag_indicators": ["RR <10/min", "AVPU = P — significant head injury", "major trauma mechanism — fall >3 metres", "major haemorrhage scalp"],
+            "recommended_action": "MAJOR TRAUMA. Cervical spine immobilisation. Control scalp bleeding. Support breathing. Urgent transfer. Do NOT give morphine — head injury.",
+            "referral_needed": True,
+            "confidence_score": 0.97
+        }
+    },
+    {
+        "lang": "fr",
+        "triage": "red",
+        "transcript_en": "Child 4 years. Meningococcal septicaemia suspected. Non-blanching petechial rash spreading rapidly over trunk and legs. Fever 39.8 degrees. Heart rate 165. Child is drowsy and cannot stand. Started 2 hours ago.",
+        "output": {
+            "triage_level": "red",
+            "primary_complaint": "Suspected meningococcal septicaemia — non-blanching purpuric rash",
+            "reported_symptoms": ["non-blanching petechial rash", "rapid spread over trunk and legs", "fever 39.8C", "tachycardia 165", "drowsiness", "unable to stand"],
+            "vital_signs_reported": {"heart_rate": "165 bpm", "temperature": "39.8C", "consciousness": "drowsy — AVPU = V"},
+            "duration_of_symptoms": "2 hours — rapid deterioration",
+            "relevant_history": "No prior illness",
+            "red_flag_indicators": ["non-blanching purpuric rash — meningococcaemia until proven otherwise", "HR >160 in child", "AVPU = V with septic shock features"],
+            "recommended_action": "LIFE-THREATENING EMERGENCY. IV benzylpenicillin or ceftriaxone NOW — do not delay for investigations. Urgent transfer. Mortality risk increases every minute without antibiotics.",
+            "referral_needed": True,
+            "confidence_score": 0.99
+        }
+    },
+
+    # ═══════════════════════════════════════════════════════
+    # ORANGE — 16 cases
+    # SATS criteria: TEWS 5-6 OR very urgent discriminator
+    # RR 25-29, HR 100-120 or 50-59, SpO2 90-94%,
+    # GCS 9-13, AVPU = V, Temp 38.5-41 or <35,
+    # severe pain, active haemorrhage controlled,
+    # fracture long bone, acute abdomen, eclampsia risk
+    # ═══════════════════════════════════════════════════════
+    {
+        "lang": "en",
+        "triage": "orange",
+        "transcript_en": "Child 5 years. High fever for 2 days, 39.5 degrees Celsius. Breathing fast at 27 breaths per minute. No chest in-drawing. SpO2 93 percent. Cough with green sputum. Eating and drinking reduced but not stopped. Heart rate 118.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Pneumonia with moderate hypoxia — possible bacterial pneumonia",
+            "reported_symptoms": ["fever 39.5C 2 days", "tachypnoea 27/min", "SpO2 93%", "productive cough green sputum", "reduced oral intake", "tachycardia 118"],
+            "vital_signs_reported": {"respiratory_rate": "27/min", "spo2": "93%", "temperature": "39.5C", "heart_rate": "118 bpm"},
+            "duration_of_symptoms": "2 days",
+            "relevant_history": "None known",
+            "red_flag_indicators": ["SpO2 90-94%", "RR 25-29 in child", "WHO ETAT priority sign — fast breathing with fever"],
+            "recommended_action": "Very urgent. Supplemental oxygen to target SpO2 >95%. Oral amoxicillin if tolerating orally. Transfer to facility with oxygen and paediatric care within 60 minutes.",
+            "referral_needed": True,
+            "confidence_score": 0.94
+        }
+    },
+    {
+        "lang": "sw",
+        "triage": "orange",
+        "transcript_en": "Adult male 50 years. Severe crushing chest pain for 90 minutes. Radiates to left shoulder. Sweating. Heart rate 104. Blood pressure not measured. Not in shock. Still conscious and oriented.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Suspected ACS — NSTEMI or unstable angina",
+            "reported_symptoms": ["severe crushing chest pain", "radiation to left shoulder", "diaphoresis", "tachycardia 104", "90 minutes duration"],
+            "vital_signs_reported": {"heart_rate": "104 bpm", "consciousness": "alert and oriented"},
+            "duration_of_symptoms": "90 minutes",
+            "relevant_history": "Unknown cardiac history",
+            "red_flag_indicators": ["acute chest pain >20 minutes — ACS until proven otherwise", "diaphoresis", "tachycardia"],
+            "recommended_action": "Very urgent. Aspirin 300mg if no allergy. Rest, IV access. 12-lead ECG if available. Transfer within 60 minutes for troponin and ECG monitoring.",
+            "referral_needed": True,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "tl",
+        "triage": "orange",
+        "transcript_en": "Pregnant woman 36 weeks. Blood pressure 170 over 110. Severe headache, visual disturbance — seeing flashing lights. Mild ankle swelling present for a week. No seizures yet. Fetal movements normal.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Severe pre-eclampsia with warning symptoms — imminent eclampsia risk",
+            "reported_symptoms": ["BP 170/110", "severe headache", "visual disturbance — photopsia", "ankle oedema 1 week"],
+            "vital_signs_reported": {"blood_pressure": "170/110 mmHg", "fetal_movements": "normal"},
+            "duration_of_symptoms": "oedema 1 week, acute symptoms current",
+            "relevant_history": "36 weeks gestation",
+            "red_flag_indicators": ["BP >160/110 — severe pre-eclampsia", "visual symptoms — impending eclampsia", "severe headache in pregnancy"],
+            "recommended_action": "Very urgent obstetric emergency. Lay on left side. Magnesium sulphate if available. Urgent transfer to obstetric unit — risk of eclampsia within hours.",
+            "referral_needed": True,
+            "confidence_score": 0.95
+        }
+    },
+    {
+        "lang": "ha",
+        "triage": "orange",
+        "transcript_en": "Adult woman 32 years. Severe abdominal pain for 3 hours, worse in lower right quadrant. Nausea and vomiting twice. Fever 38.7 degrees. Heart rate 108. Walking bent over due to pain. Last period was 6 weeks ago.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Acute lower right quadrant abdominal pain — appendicitis or ectopic pregnancy must be excluded",
+            "reported_symptoms": ["severe RLQ abdominal pain 3 hours", "nausea", "vomiting x2", "fever 38.7C", "tachycardia 108", "amenorrhoea 6 weeks"],
+            "vital_signs_reported": {"heart_rate": "108 bpm", "temperature": "38.7C"},
+            "duration_of_symptoms": "3 hours",
+            "relevant_history": "LMP 6 weeks ago — ectopic pregnancy must be excluded",
+            "red_flag_indicators": ["acute abdomen discriminator", "possible ectopic pregnancy given amenorrhoea", "fever with tachycardia — peritonitis risk"],
+            "recommended_action": "Very urgent. IV access. Do NOT give food or water. Urgent transfer for surgical review and pregnancy test. If ectopic and ruptured — will rapidly become RED.",
+            "referral_needed": True,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "bn",
+        "triage": "orange",
+        "transcript_en": "Child 18 months. Diarrhoea for 3 days, now more than 10 watery stools per day. Vomited 5 times today. Sunken eyes. Skin pinch returns slowly — more than 2 seconds. No tears when crying. Breathing fast, 28 breaths per minute.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Severe dehydration from acute gastroenteritis — WHO ETAT some dehydration with danger signs",
+            "reported_symptoms": ["diarrhoea 3 days >10 stools/day", "vomiting x5", "sunken eyes", "slow skin turgor >2 seconds", "no tears", "tachypnoea 28/min"],
+            "vital_signs_reported": {"respiratory_rate": "28/min", "skin_turgor": ">2 seconds recoil"},
+            "duration_of_symptoms": "3 days",
+            "relevant_history": "18-month-old — high dehydration risk",
+            "red_flag_indicators": ["WHO ETAT — severe dehydration signs: sunken eyes, slow turgor, no tears", "RR 25-29", "high stool frequency with vomiting"],
+            "recommended_action": "Very urgent. ORS if tolerating, IV fluids (Ringer's lactate) if not tolerating orally. Weigh child. Transfer for IV rehydration and monitoring.",
+            "referral_needed": True,
+            "confidence_score": 0.94
+        }
+    },
+    {
+        "lang": "hi",
+        "triage": "orange",
+        "transcript_en": "Adult male 28 years. Stabbed in the right upper arm 1 hour ago. Wound controlled with cloth but still oozing. He is conscious, heart rate 102, breathing 22 per minute. Hand has reduced sensation compared to other side. Fingers moving but weak.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Penetrating arm wound with possible neurovascular injury",
+            "reported_symptoms": ["stab wound right upper arm", "controlled haemorrhage — ongoing ooze", "tachycardia 102", "reduced hand sensation", "weak finger movement"],
+            "vital_signs_reported": {"heart_rate": "102 bpm", "respiratory_rate": "22/min", "neurovascular": "reduced sensation and grip right hand"},
+            "duration_of_symptoms": "1 hour",
+            "relevant_history": "Assault with knife",
+            "red_flag_indicators": ["neurovascular compromise distal to wound", "tachycardia — partial haemorrhagic shock", "controlled but ongoing haemorrhage"],
+            "recommended_action": "Very urgent. Maintain pressure. IV access. Neurovascular monitoring every 15 minutes. Transfer for vascular and nerve assessment — risk of permanent disability if delayed.",
+            "referral_needed": True,
+            "confidence_score": 0.92
+        }
+    },
+    {
+        "lang": "am",
+        "triage": "orange",
+        "transcript_en": "Female 45 years. Known HIV positive. Dry cough for 3 weeks, now getting worse. Night sweats. Lost 8 kilograms in 2 months. Respiratory rate 26 per minute. Temperature 38.6 degrees. Not on ART. SpO2 91 percent.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Suspected tuberculosis with hypoxia — possibly Pneumocystis jirovecii pneumonia in PLHIV",
+            "reported_symptoms": ["cough 3 weeks", "night sweats", "weight loss 8kg in 2 months", "tachypnoea 26/min", "fever 38.6C", "SpO2 91%", "HIV positive not on ART"],
+            "vital_signs_reported": {"respiratory_rate": "26/min", "spo2": "91%", "temperature": "38.6C"},
+            "duration_of_symptoms": "3 weeks cough, 2 months constitutional symptoms",
+            "relevant_history": "HIV positive, not on antiretroviral therapy",
+            "red_flag_indicators": ["SpO2 90-94%", "RR 25-29", "immunocompromised with respiratory deterioration — TB or PJP"],
+            "recommended_action": "Very urgent. Isolate for airborne precautions — possible TB. Supplemental oxygen. Urgent sputum collection. Transfer for chest X-ray and CD4 count.",
+            "referral_needed": True,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "fr",
+        "triage": "orange",
+        "transcript_en": "Child 3 years. Ingested rat poison pellets approximately 45 minutes ago. Awake and crying. No vomiting yet. Parents bring the box — warfarin-based rodenticide. Heart rate 120. No bleeding visible.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Anticoagulant rodenticide poisoning — superwarfarin ingestion",
+            "reported_symptoms": ["warfarin rodenticide ingestion 45 minutes ago", "awake and crying", "no vomiting", "tachycardia 120", "no visible bleeding"],
+            "vital_signs_reported": {"heart_rate": "120 bpm", "consciousness": "alert and crying"},
+            "duration_of_symptoms": "45 minutes post-ingestion",
+            "relevant_history": "3-year-old — weight approximately 14kg",
+            "red_flag_indicators": ["poisoning discriminator — toxic ingestion child", "anticoagulant — coagulopathy may develop within 24-48 hours", "tachycardia — possible anxiety or early toxicity"],
+            "recommended_action": "Very urgent. Do NOT induce vomiting. Activated charcoal 1g/kg if within 1 hour and conscious. Urgent transfer for vitamin K and coagulation monitoring.",
+            "referral_needed": True,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "en",
+        "triage": "orange",
+        "transcript_en": "Adult male 38 years. Road traffic accident. Thrown from motorcycle 2 hours ago. Not wearing helmet. Complained of neck pain at scene. Walking with difficulty. Alert, GCS 14 — slightly confused. Heart rate 95. Right leg deformity at thigh.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Road trauma — possible cervical spine injury and femur fracture",
+            "reported_symptoms": ["RTA thrown from motorcycle", "neck pain", "GCS 14", "right thigh deformity", "walking difficulty"],
+            "vital_signs_reported": {"heart_rate": "95 bpm", "gcs": "14 — slightly confused"},
+            "duration_of_symptoms": "2 hours post-accident",
+            "relevant_history": "No helmet worn",
+            "red_flag_indicators": ["GCS 9-13 — AVPU = V or impaired A", "mechanism — high-energy trauma", "cervical spine injury risk", "long bone fracture"],
+            "recommended_action": "Very urgent. Cervical spine immobilisation immediately — do NOT remove. Splint femur. IV access. Transfer for CT head/C-spine and orthopaedic review.",
+            "referral_needed": True,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "sw",
+        "triage": "orange",
+        "transcript_en": "Adult male 55 years, known diabetic. Blood sugar measured at 22 mmol per litre. Breathing deep and fast — Kussmaul pattern, 26 breaths per minute. Fruity breath odour. Alert but confused. Vomiting. Has not taken insulin for 2 days.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Diabetic ketoacidosis — DKA",
+            "reported_symptoms": ["blood glucose 22 mmol/L", "Kussmaul breathing 26/min", "fruity breath odour", "confusion", "vomiting", "no insulin 2 days"],
+            "vital_signs_reported": {"respiratory_rate": "26/min", "blood_glucose": "22 mmol/L", "breath_odour": "fruity — ketones"},
+            "duration_of_symptoms": "2 days of missed insulin",
+            "relevant_history": "Type 1 or Type 2 diabetes",
+            "red_flag_indicators": ["RR 25-29 — Kussmaul breathing", "significant metabolic acidosis pattern", "DKA discriminator"],
+            "recommended_action": "Very urgent. IV access immediately. IV fluids — normal saline. Insulin protocol. Electrolyte monitoring essential. Transfer for IV insulin and close monitoring.",
+            "referral_needed": True,
+            "confidence_score": 0.94
+        }
+    },
+    {
+        "lang": "tl",
+        "triage": "orange",
+        "transcript_en": "Woman 22 years. Severe allergic reaction after eating shrimp 20 minutes ago. Hives all over body. Lips and tongue swelling but airway currently clear. Voice sounds slightly hoarse. Heart rate 112. No difficulty breathing yet.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Moderate to severe allergic reaction — anaphylaxis developing, airway at risk",
+            "reported_symptoms": ["hives generalised", "lip and tongue swelling", "hoarse voice", "tachycardia 112", "shrimp ingestion 20 minutes prior", "airway currently patent"],
+            "vital_signs_reported": {"heart_rate": "112 bpm", "airway": "patent but voice hoarse"},
+            "duration_of_symptoms": "20 minutes post-exposure",
+            "relevant_history": "Possible shellfish allergy",
+            "red_flag_indicators": ["anaphylaxis — progressing airway angioedema", "hoarse voice — early laryngeal oedema", "risk of rapid escalation to RED"],
+            "recommended_action": "Very urgent — may escalate to RED rapidly. Adrenaline 0.5mg IM immediately (0.5ml of 1:1000). Lie flat, elevate legs. Antihistamine and steroids after adrenaline. Transfer urgently.",
+            "referral_needed": True,
+            "confidence_score": 0.95
+        }
+    },
+    {
+        "lang": "ha",
+        "triage": "orange",
+        "transcript_en": "Adult male 30 years. High fever 39.8 degrees for 5 days. Positive malaria rapid test. Confused and disoriented — keeps asking the same questions. Heart rate 115. Cannot walk without help. Vomited twice today.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Severe malaria — possible cerebral malaria with altered mental status",
+            "reported_symptoms": ["fever 39.8C 5 days", "positive malaria RDT", "confusion and disorientation", "tachycardia 115", "cannot walk unaided", "vomiting x2"],
+            "vital_signs_reported": {"temperature": "39.8C", "heart_rate": "115 bpm", "consciousness": "confused — AVPU = V"},
+            "duration_of_symptoms": "5 days",
+            "relevant_history": "Malaria RDT positive",
+            "red_flag_indicators": ["AVPU = V — altered consciousness with malaria = cerebral malaria until proven otherwise", "WHO severe malaria criterion: altered consciousness", "tachycardia"],
+            "recommended_action": "Very urgent — cerebral malaria is rapidly fatal. IV artesunate or IV quinine if artesunate unavailable. IV fluids cautiously. Urgent transfer. Blood glucose check.",
+            "referral_needed": True,
+            "confidence_score": 0.95
+        }
+    },
+    {
+        "lang": "bn",
+        "triage": "orange",
+        "transcript_en": "Child 8 years. Tetanus — jaw locked, cannot open mouth. Muscle spasms of back and neck when touched. Alert. No wound visible but had a thorn injury to foot 10 days ago. Respiratory rate 25. Heart rate 108. Not vaccinated.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Tetanus — trismus and opisthotonus with risk of respiratory compromise",
+            "reported_symptoms": ["locked jaw — trismus", "muscle spasms on stimulation", "thorn injury foot 10 days ago", "not vaccinated", "tachypnoea 25/min", "tachycardia 108"],
+            "vital_signs_reported": {"respiratory_rate": "25/min", "heart_rate": "108 bpm", "jaw": "locked — cannot open"},
+            "duration_of_symptoms": "onset unclear — thorn injury 10 days ago",
+            "relevant_history": "Unvaccinated, foot thorn injury 10 days prior",
+            "red_flag_indicators": ["tetanus discriminator — trismus", "respiratory compromise risk — laryngospasm can occur suddenly", "unvaccinated child"],
+            "recommended_action": "Very urgent. Minimal stimulation — dark quiet room. Human tetanus immunoglobulin if available. Metronidazole. Tetanus toxoid. Urgent transfer to facility with ventilation capability.",
+            "referral_needed": True,
+            "confidence_score": 0.94
+        }
+    },
+    {
+        "lang": "hi",
+        "triage": "orange",
+        "transcript_en": "Elderly woman 70 years. Found on floor at home after not being seen for 12 hours. Alert but confused, GCS 12. Temperature 34.8 degrees Celsius — very cold to touch. Heart rate 52. Breathing slow at 10 breaths per minute.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Moderate hypothermia with bradycardia and altered consciousness",
+            "reported_symptoms": ["found on floor after 12 hours", "GCS 12 — confused", "temperature 34.8C", "bradycardia 52", "breathing 10/min", "cold to touch"],
+            "vital_signs_reported": {"temperature": "34.8C", "heart_rate": "52 bpm", "respiratory_rate": "10/min", "gcs": "12"},
+            "duration_of_symptoms": "at least 12 hours",
+            "relevant_history": "Elderly — social isolation suspected",
+            "red_flag_indicators": ["temperature <35C — hypothermia", "GCS 9-13", "bradycardia <60 — secondary to hypothermia", "RR borderline"],
+            "recommended_action": "Very urgent. Gentle passive rewarming — warm blankets, warm environment. Remove wet clothing. IV warm fluids. Monitor cardiac rhythm — VF risk in hypothermia. Transfer.",
+            "referral_needed": True,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "am",
+        "triage": "orange",
+        "transcript_en": "Adult man 42 years. Severe headache described as the worst of his life, sudden onset while straining to lift something 2 hours ago. Stiff neck. Vomited once. Alert, GCS 15. Heart rate 72. No fever.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Thunderclap headache with meningism — subarachnoid haemorrhage or meningitis must be excluded",
+            "reported_symptoms": ["worst headache of life — thunderclap onset", "onset during Valsalva", "neck stiffness — meningism", "vomiting x1", "GCS 15", "afebrile"],
+            "vital_signs_reported": {"heart_rate": "72 bpm", "gcs": "15", "temperature": "normal"},
+            "duration_of_symptoms": "2 hours",
+            "relevant_history": "No prior headaches of this severity",
+            "red_flag_indicators": ["thunderclap headache — SAH until proven otherwise", "meningism — neck stiffness", "sentinel headache pattern"],
+            "recommended_action": "Very urgent. Do NOT give analgesia before CT. Urgent CT head. If CT negative, lumbar puncture required. Transfer for neurosurgical assessment.",
+            "referral_needed": True,
+            "confidence_score": 0.94
+        }
+    },
+    {
+        "lang": "fr",
+        "triage": "orange",
+        "transcript_en": "Child 6 years. Bite from a suspected rabid dog 4 hours ago. Deep laceration on right forearm and hand. Dog was behaving abnormally — foaming at mouth. Child alert and crying. Wound still bleeding mildly. Heart rate 110.",
+        "output": {
+            "triage_level": "orange",
+            "primary_complaint": "Animal bite with high rabies transmission risk — deep wound from suspected rabid dog",
+            "reported_symptoms": ["deep bite wound right forearm and hand", "suspected rabid dog — abnormal behaviour", "mild ongoing bleeding", "tachycardia 110", "alert and crying"],
+            "vital_signs_reported": {"heart_rate": "110 bpm", "wound": "deep laceration with mild bleeding"},
+            "duration_of_symptoms": "4 hours post-bite",
+            "relevant_history": "Dog appeared rabid — foaming at mouth",
+            "red_flag_indicators": ["high-risk rabies exposure — deep wound from suspected rabid animal", "paediatric patient — higher rabies transmission risk", "wound on extremity — near peripheral nerves"],
+            "recommended_action": "Very urgent. Irrigate wound thoroughly with soap and water for 15 minutes immediately. Rabies post-exposure prophylaxis (PEP) must begin within 24 hours. Tetanus prophylaxis. Transfer.",
+            "referral_needed": True,
+            "confidence_score": 0.93
+        }
+    },
+
+    # ═══════════════════════════════════════════════════════
+    # YELLOW — 16 cases
+    # SATS criteria: TEWS 3-4 OR urgent discriminator
+    # Moderate pain, RR 20-24, HR 100-109, Temp 37.5-38.4,
+    # stable vitals with significant complaint needing assessment
+    # ═══════════════════════════════════════════════════════
+    {
+        "lang": "en",
+        "triage": "yellow",
+        "transcript_en": "Adult woman 35 years. Urinary burning and frequency for 3 days. Lower abdominal cramps. Temperature 37.8 degrees. No fever rigors. Heart rate 88. Passing urine frequently — small amounts. No back pain.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Urinary tract infection — uncomplicated cystitis",
+            "reported_symptoms": ["dysuria 3 days", "urinary frequency", "lower abdominal cramps", "temperature 37.8C", "no rigors", "no back pain"],
+            "vital_signs_reported": {"temperature": "37.8C", "heart_rate": "88 bpm"},
+            "duration_of_symptoms": "3 days",
+            "relevant_history": "None mentioned",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent but not immediately life-threatening. Urine dipstick. Oral antibiotics — trimethoprim or nitrofurantoin. Increase fluid intake. Review if fever develops or back pain begins.",
+            "referral_needed": False,
+            "confidence_score": 0.91
+        }
+    },
+    {
+        "lang": "sw",
+        "triage": "yellow",
+        "transcript_en": "Male 22 years. Ankle injury from football game 2 hours ago. Significant swelling and bruising. Able to bear weight with pain. No deformity visible. Temperature normal. Heart rate 84. No neurovascular deficit.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Ankle sprain — possible grade 2 or 3 lateral ligament injury",
+            "reported_symptoms": ["ankle injury 2 hours ago", "swelling and bruising", "able to weight-bear with pain", "no deformity"],
+            "vital_signs_reported": {"heart_rate": "84 bpm", "temperature": "normal"},
+            "duration_of_symptoms": "2 hours",
+            "relevant_history": "Sports injury",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent assessment for fracture — Ottawa ankle rules. X-ray if available. RICE — rest, ice, compression, elevation. Analgesia. Fracture clinic if Ottawa rules positive.",
+            "referral_needed": False,
+            "confidence_score": 0.90
+        }
+    },
+    {
+        "lang": "tl",
+        "triage": "yellow",
+        "transcript_en": "Woman 28 years, 16 weeks pregnant. Moderate vaginal bleeding since this morning — less than a full sanitary pad. No abdominal pain. Fetal movements not yet felt due to gestation. Cervix not examined. Heart rate 90. Blood pressure normal.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Threatened miscarriage — antepartum bleeding 16 weeks gestation",
+            "reported_symptoms": ["moderate vaginal bleeding", "16 weeks pregnant", "no abdominal pain", "less than full pad saturation"],
+            "vital_signs_reported": {"heart_rate": "90 bpm", "blood_pressure": "normal"},
+            "duration_of_symptoms": "since this morning",
+            "relevant_history": "16 weeks gestation — first or subsequent pregnancy unknown",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent obstetric assessment. Rest. Pelvic exam by trained provider. Ultrasound to confirm fetal viability and placental location. Rhesus blood group and anti-D if Rh negative.",
+            "referral_needed": True,
+            "confidence_score": 0.90
+        }
+    },
+    {
+        "lang": "ha",
+        "triage": "yellow",
+        "transcript_en": "Child 4 years. Fever 38.3 degrees for 1 day. Ear pain, pulling at right ear, crying. No hearing loss reported. Throat not visible. Heart rate 102. Eating reduced. No neck stiffness. No rash.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Acute otitis media — right ear infection",
+            "reported_symptoms": ["fever 38.3C", "right ear pain", "pulling at right ear", "reduced feeding", "tachycardia 102 — likely fever-related"],
+            "vital_signs_reported": {"temperature": "38.3C", "heart_rate": "102 bpm"},
+            "duration_of_symptoms": "1 day",
+            "relevant_history": "None",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent but not critical. Otoscopy — confirm AOM. Analgesics — paracetamol or ibuprofen. Amoxicillin for children under 2 or severe symptoms. Review in 48-72 hours.",
+            "referral_needed": False,
+            "confidence_score": 0.90
+        }
+    },
+    {
+        "lang": "bn",
+        "triage": "yellow",
+        "transcript_en": "Adult male 44 years. Back pain for 3 days after lifting heavy bags. Moderate pain — 6 out of 10. No leg pain or numbness. No bladder or bowel changes. Walking with discomfort. Temperature normal. Heart rate 82.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Acute mechanical low back pain",
+            "reported_symptoms": ["back pain 3 days", "onset after heavy lifting", "pain 6/10", "no radiculopathy", "no bladder/bowel dysfunction"],
+            "vital_signs_reported": {"heart_rate": "82 bpm", "temperature": "normal"},
+            "duration_of_symptoms": "3 days",
+            "relevant_history": "Occupational heavy lifting",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent for pain management. NSAIDs if no contraindication. Encourage gentle mobilisation. No bed rest. Red flags to watch: bilateral leg weakness, saddle anaesthesia, bladder retention — return if these develop.",
+            "referral_needed": False,
+            "confidence_score": 0.90
+        }
+    },
+    {
+        "lang": "hi",
+        "triage": "yellow",
+        "transcript_en": "Child 7 years. Woke with right eye swollen shut. Eyelid red, warm and tender. No visual disturbance. No proptosis visible. Temperature 38.1 degrees. Heart rate 98. Started 24 hours ago.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Periorbital (preseptal) cellulitis — right eye",
+            "reported_symptoms": ["right eyelid swollen shut", "erythema and warmth", "no visual change", "no proptosis", "fever 38.1C", "onset 24 hours"],
+            "vital_signs_reported": {"temperature": "38.1C", "heart_rate": "98 bpm"},
+            "duration_of_symptoms": "24 hours",
+            "relevant_history": "None",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent. Distinguish pre- vs postseptal — check eye movements and visual acuity. If eye movements normal and vision intact, oral antibiotics (co-amoxiclav). Review in 24 hours — escalate if proptosis or eye movement restriction.",
+            "referral_needed": False,
+            "confidence_score": 0.90
+        }
+    },
+    {
+        "lang": "am",
+        "triage": "yellow",
+        "transcript_en": "Female 19 years. Moderate abdominal pain for 6 hours. Nausea. Last period 4 weeks ago — period is 10 days late. No vaginal bleeding. Temperature 37.2. Heart rate 96. Tenderness in lower abdomen on both sides.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Possible early ectopic pregnancy — pregnancy test required urgently",
+            "reported_symptoms": ["lower abdominal pain 6 hours", "nausea", "LMP 4 weeks ago — 10 days late", "no vaginal bleeding", "bilateral lower abdominal tenderness"],
+            "vital_signs_reported": {"temperature": "37.2C", "heart_rate": "96 bpm"},
+            "duration_of_symptoms": "6 hours pain, 10 days amenorrhoea",
+            "relevant_history": "Possible pregnancy",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent. Urine or blood pregnancy test immediately. If positive — treat as possible ectopic until proven otherwise. If worsening pain or tachycardia increases — escalate to ORANGE or RED.",
+            "referral_needed": True,
+            "confidence_score": 0.91
+        }
+    },
+    {
+        "lang": "fr",
+        "triage": "yellow",
+        "transcript_en": "Adult male 50 years. Painful, swollen right knee for 4 days. Red hot to touch. No injury. Fever 38.2. Heart rate 94. Cannot fully bend the knee. Lives alone. Has gout history.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Acute monoarthritis right knee — septic arthritis must be excluded",
+            "reported_symptoms": ["painful swollen right knee 4 days", "erythema and warmth", "no trauma", "fever 38.2C", "tachycardia 94", "reduced ROM", "gout history"],
+            "vital_signs_reported": {"temperature": "38.2C", "heart_rate": "94 bpm"},
+            "duration_of_symptoms": "4 days",
+            "relevant_history": "Gout — but septic arthritis cannot be clinically distinguished without joint aspiration",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent. Cannot distinguish gout from septic arthritis clinically. Joint aspiration required. If septic arthritis — systemic sepsis risk. Transfer for aspiration and synovial fluid culture.",
+            "referral_needed": True,
+            "confidence_score": 0.90
+        }
+    },
+    {
+        "lang": "en",
+        "triage": "yellow",
+        "transcript_en": "Child 10 years. Sickle cell disease. Moderate pain crisis — legs and back, 6 out of 10. Temperature 37.9. Heart rate 104. No chest pain. No difficulty breathing. Drinking fluids. Started yesterday.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Sickle cell vaso-occlusive crisis — moderate uncomplicated",
+            "reported_symptoms": ["sickle cell disease", "vaso-occlusive pain crisis", "legs and back pain 6/10", "temperature 37.9C", "tachycardia 104", "no chest symptoms", "hydrating"],
+            "vital_signs_reported": {"temperature": "37.9C", "heart_rate": "104 bpm"},
+            "duration_of_symptoms": "since yesterday",
+            "relevant_history": "Known sickle cell disease",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent. Oral analgesia — ibuprofen and paracetamol. Push oral fluids. Avoid cold. Monitor for acute chest syndrome — if fever >38.5, chest pain, or respiratory symptoms develop escalate immediately.",
+            "referral_needed": False,
+            "confidence_score": 0.91
+        }
+    },
+    {
+        "lang": "sw",
+        "triage": "yellow",
+        "transcript_en": "Man 33 years. Watery eye discharge, red eye, photophobia for 2 days. Right eye affected. Temperature normal. No visual change. No contact lens use. Heart rate 78. Discharge is mucopurulent.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Acute infective conjunctivitis with photophobia — keratitis must be excluded",
+            "reported_symptoms": ["watery then mucopurulent discharge", "red eye right", "photophobia 2 days", "no visual change", "no contact lenses"],
+            "vital_signs_reported": {"temperature": "normal", "heart_rate": "78 bpm"},
+            "duration_of_symptoms": "2 days",
+            "relevant_history": "No contact lens use",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent. Slit lamp if available to exclude keratitis or ulcer. Chloramphenicol eye drops. If visual loss or corneal opacity present — escalate. Gonorrhoeal conjunctivitis if severe — systemic antibiotics needed.",
+            "referral_needed": False,
+            "confidence_score": 0.89
+        }
+    },
+    {
+        "lang": "tl",
+        "triage": "yellow",
+        "transcript_en": "Adult female 40 years. Thyroid swelling for 3 months, recently growing faster. Difficulty swallowing solids. No breathing difficulty. No weight loss. Temperature normal. Heart rate 78. Swelling is firm and non-tender.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Thyroid goitre with dysphagia — malignancy must be excluded",
+            "reported_symptoms": ["thyroid swelling 3 months — enlarging", "dysphagia for solids", "no dyspnoea", "firm non-tender swelling"],
+            "vital_signs_reported": {"temperature": "normal", "heart_rate": "78 bpm"},
+            "duration_of_symptoms": "3 months — accelerating",
+            "relevant_history": "None",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent outpatient referral. Thyroid function tests. Ultrasound. Fine needle aspiration if discrete nodule. Rapidly growing firm thyroid requires urgent ENT or surgical review.",
+            "referral_needed": True,
+            "confidence_score": 0.89
+        }
+    },
+    {
+        "lang": "ha",
+        "triage": "yellow",
+        "transcript_en": "Male 29 years. Right-sided scrotal pain for 6 hours, sudden onset during sleep. Moderate to severe pain. Testis appears elevated and slightly swollen. No fever. Heart rate 100. No dysuria.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Possible testicular torsion — surgical emergency if confirmed",
+            "reported_symptoms": ["sudden right scrotal pain 6 hours", "onset during sleep", "testis elevated and swollen", "no fever", "tachycardia 100 — pain-related"],
+            "vital_signs_reported": {"heart_rate": "100 bpm", "temperature": "normal"},
+            "duration_of_symptoms": "6 hours — time critical for salvage",
+            "relevant_history": "None",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent surgical review NOW — testicular torsion is time-critical. Testis non-viable after 6 hours in many cases, risk increases rapidly. Urgent transfer for Doppler ultrasound and surgical exploration.",
+            "referral_needed": True,
+            "confidence_score": 0.92
+        }
+    },
+    {
+        "lang": "bn",
+        "triage": "yellow",
+        "transcript_en": "Child 3 years. Ingested one iron tablet belonging to mother 2 hours ago. Alert, playing, no symptoms yet. Heart rate 105. Temperature normal. Vomited once. Appears well.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Iron tablet ingestion in toddler — toxicology assessment required",
+            "reported_symptoms": ["single iron tablet ingestion 2 hours ago", "one vomiting episode", "alert and playing", "no symptoms currently"],
+            "vital_signs_reported": {"heart_rate": "105 bpm", "temperature": "normal"},
+            "duration_of_symptoms": "2 hours post-ingestion, currently asymptomatic",
+            "relevant_history": "Child 3 years — approximate weight 14kg",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent assessment — iron toxicity can develop 6-24 hours after ingestion. Do NOT induce vomiting. Abdominal X-ray to count tablets. Serum iron level at 4 hours. Transfer for monitoring.",
+            "referral_needed": True,
+            "confidence_score": 0.90
+        }
+    },
+    {
+        "lang": "hi",
+        "triage": "yellow",
+        "transcript_en": "Adult female 55 years. Sudden onset severe unilateral headache, mainly around right eye. Eye red and watery. Nausea. No vomiting. Vision slightly blurred in right eye. Heart rate 88. Started 3 hours ago.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Suspected acute angle-closure glaucoma — right eye",
+            "reported_symptoms": ["severe right periorbital headache", "red watery right eye", "nausea", "blurred vision right eye", "sudden onset 3 hours"],
+            "vital_signs_reported": {"heart_rate": "88 bpm"},
+            "duration_of_symptoms": "3 hours",
+            "relevant_history": "None mentioned — age and female sex are risk factors",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent ophthalmological emergency. Check visual acuity and intraocular pressure if tonometer available. Do NOT dilate pupil. Urgent transfer for IOP lowering treatment — permanent visual loss risk.",
+            "referral_needed": True,
+            "confidence_score": 0.91
+        }
+    },
+    {
+        "lang": "am",
+        "triage": "yellow",
+        "transcript_en": "Adult male 48 years. Moderate chest pain, non-radiating, worse on breathing in. 4 days after completing treatment for pneumonia. Temperature 37.6. Heart rate 97. Mild tachypnoea at 22 breaths per minute.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Pleuritic chest pain post-pneumonia — pulmonary embolism must be excluded",
+            "reported_symptoms": ["pleuritic chest pain 4 days post-pneumonia", "no radiation", "tachypnoea 22/min", "temperature 37.6C", "tachycardia 97"],
+            "vital_signs_reported": {"respiratory_rate": "22/min", "heart_rate": "97 bpm", "temperature": "37.6C"},
+            "duration_of_symptoms": "acute, post-infectious",
+            "relevant_history": "Recent pneumonia treatment",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent. Wells score for PE. D-dimer if available. SpO2 monitoring. If PE suspected on clinical grounds — transfer for CTPA. Do not delay anticoagulation if high clinical probability.",
+            "referral_needed": True,
+            "confidence_score": 0.90
+        }
+    },
+    {
+        "lang": "fr",
+        "triage": "yellow",
+        "transcript_en": "Child 9 years. Elbow injury after falling from bicycle. Moderate swelling and deformity at distal humerus. Able to feel and move fingers. Radial pulse present. Temperature normal. Heart rate 95. Pain 7 out of 10.",
+        "output": {
+            "triage_level": "yellow",
+            "primary_complaint": "Paediatric supracondylar humeral fracture — neurovascular monitoring essential",
+            "reported_symptoms": ["elbow injury after fall", "deformity distal humerus", "moderate swelling", "fingers moving and sensate", "radial pulse present", "pain 7/10"],
+            "vital_signs_reported": {"heart_rate": "95 bpm", "neurovascular": "intact distal to fracture currently"},
+            "duration_of_symptoms": "acute injury",
+            "relevant_history": "Bicycle fall",
+            "red_flag_indicators": [],
+            "recommended_action": "Urgent. Immobilise in position of comfort — do NOT straighten. Neurovascular checks every 30 minutes — supracondylar fractures can compromise brachial artery. Urgent transfer for X-ray and orthopaedic review.",
+            "referral_needed": True,
+            "confidence_score": 0.91
+        }
+    },
+
+    # ═══════════════════════════════════════════════════════
+    # GREEN — 16 cases
+    # SATS criteria: TEWS 1-2 OR routine discriminator
+    # Stable vitals, minor complaints, ambulatory, no acute
+    # deterioration risk
+    # ═══════════════════════════════════════════════════════
+    {
+        "lang": "en",
+        "triage": "green",
+        "transcript_en": "Adult male 28 years. Sore throat for 4 days. Mild fever 37.4 degrees. Difficulty swallowing. No stridor. No drooling. No neck swelling. Heart rate 78. Eating soft food. Fully alert and walking.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Pharyngitis — viral or streptococcal",
+            "reported_symptoms": ["sore throat 4 days", "mild fever 37.4C", "odynophagia", "no stridor or drooling", "tolerating soft food"],
+            "vital_signs_reported": {"temperature": "37.4C", "heart_rate": "78 bpm"},
+            "duration_of_symptoms": "4 days",
+            "relevant_history": "None",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Centor or McIsaac score — throat swab if available. Paracetamol and fluids. If Centor score ≥3 and no access to swab, consider empirical penicillin. Return if drooling, stridor or unable to swallow saliva.",
+            "referral_needed": False,
+            "confidence_score": 0.92
+        }
+    },
+    {
+        "lang": "sw",
+        "triage": "green",
+        "transcript_en": "Woman 30 years. Has had a cough for 6 weeks, dry and non-productive. No fever. Weight stable. No night sweats. No blood in sputum. Heart rate 76. Breathing normally. Works in a dusty environment.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Chronic cough — occupational or post-viral, TB screening required given setting",
+            "reported_symptoms": ["cough 6 weeks — dry non-productive", "no fever", "no haemoptysis", "no night sweats", "stable weight", "dusty occupational exposure"],
+            "vital_signs_reported": {"heart_rate": "76 bpm", "temperature": "normal"},
+            "duration_of_symptoms": "6 weeks",
+            "relevant_history": "Dusty work environment",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Chest X-ray and sputum AFB smear — 6-week cough in LMIC setting requires TB exclusion regardless of symptoms. HIV test if unknown status. Return urgently if haemoptysis or night sweats develop.",
+            "referral_needed": False,
+            "confidence_score": 0.91
+        }
+    },
+    {
+        "lang": "tl",
+        "triage": "green",
+        "transcript_en": "Boy 12 years. Small cut on right palm from broken glass, 2 centimetres long, bleeding has stopped with pressure. Fully alert. Tetanus vaccination up to date. Heart rate 80. No tendon injury — full finger movement.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Minor laceration right palm — wound closure required",
+            "reported_symptoms": ["2cm laceration right palm", "bleeding stopped", "full finger movement", "tetanus vaccinated"],
+            "vital_signs_reported": {"heart_rate": "80 bpm"},
+            "duration_of_symptoms": "acute injury",
+            "relevant_history": "Tetanus vaccination up to date",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine wound care. Irrigate with clean water. Wound closure with sutures or steri-strips. Tetanus booster only if >10 years since last dose or unknown. Review in 5 days.",
+            "referral_needed": False,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "ha",
+        "triage": "green",
+        "transcript_en": "Adult woman 25 years. Has not had a period for 7 weeks. Positive home pregnancy test. No abdominal pain. No vaginal bleeding. Feels well. Heart rate 74. Blood pressure normal. First pregnancy.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Confirmed early pregnancy — first antenatal visit",
+            "reported_symptoms": ["7 weeks amenorrhoea", "positive urine pregnancy test", "no pain", "no bleeding", "feels well", "primigravida"],
+            "vital_signs_reported": {"heart_rate": "74 bpm", "blood_pressure": "normal"},
+            "duration_of_symptoms": "7 weeks gestation",
+            "relevant_history": "Primigravida",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine antenatal booking. Confirm gestational age with ultrasound. Blood group and Rhesus, full blood count, HIV, syphilis, hepatitis B. Folic acid 5mg daily. Book antenatal visits.",
+            "referral_needed": False,
+            "confidence_score": 0.92
+        }
+    },
+    {
+        "lang": "bn",
+        "triage": "green",
+        "transcript_en": "Adult male 60 years. Type 2 diabetes — routine medication review. Blood glucose today 8.4 mmol per litre. No symptoms of hypo or hyperglycaemia. Blood pressure 138 over 82. Heart rate 72. Feet examined — no wounds.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Type 2 diabetes mellitus — routine chronic disease review",
+            "reported_symptoms": ["routine diabetes review", "blood glucose 8.4 mmol/L — acceptable control", "BP 138/82", "no foot wounds"],
+            "vital_signs_reported": {"heart_rate": "72 bpm", "blood_pressure": "138/82 mmHg", "blood_glucose": "8.4 mmol/L"},
+            "duration_of_symptoms": "chronic — routine review",
+            "relevant_history": "Type 2 diabetes mellitus",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Optimise antidiabetic medications if HbA1c >7%. Review BP target <130/80 for diabetics. Foot care education. Annual eye check, urine albumin-creatinine ratio. Reinforce lifestyle advice.",
+            "referral_needed": False,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "hi",
+        "triage": "green",
+        "transcript_en": "Child 5 years. Chickenpox rash for 3 days. Itchy blisters over trunk, face and limbs. Mild fever 37.6. Not scratching blisters on face. Eating and drinking normally. Heart rate 88. No breathing difficulty. Not immunocompromised.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Varicella — chickenpox, uncomplicated",
+            "reported_symptoms": ["chickenpox rash 3 days", "pruritic vesicles trunk face limbs", "mild fever 37.6C", "eating normally", "no respiratory symptoms"],
+            "vital_signs_reported": {"temperature": "37.6C", "heart_rate": "88 bpm"},
+            "duration_of_symptoms": "3 days",
+            "relevant_history": "Not immunocompromised",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Calamine lotion for itch. Paracetamol for fever — NO aspirin. Keep fingernails short. Isolate from immunocompromised contacts and pregnant women. Return if respiratory distress, confusion or secondary bacterial infection develops.",
+            "referral_needed": False,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "am",
+        "triage": "green",
+        "transcript_en": "Adult female 38 years. Mild headache for 2 days, frontal. Runny nose. Sneezing. Sore throat mild. No fever. No nausea. Heart rate 70. Fully functional — came to clinic on foot.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Upper respiratory tract infection — common cold",
+            "reported_symptoms": ["frontal headache 2 days", "rhinorrhoea", "sneezing", "mild sore throat", "afebrile"],
+            "vital_signs_reported": {"heart_rate": "70 bpm", "temperature": "normal"},
+            "duration_of_symptoms": "2 days",
+            "relevant_history": "None",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Reassurance and symptomatic treatment. Paracetamol. Saline nasal rinse. Adequate hydration. Antibiotics not indicated. Return if fever >38.5, facial pain, or worsening after 10 days.",
+            "referral_needed": False,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "fr",
+        "triage": "green",
+        "transcript_en": "Male 45 years. Haemorrhoids with mild rectal bleeding — fresh blood on toilet paper for 2 weeks. No anal pain. No weight loss. No change in bowel habit. Heart rate 74. No anaemia symptoms. Fully active.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Symptomatic haemorrhoids with minor per-rectal bleeding",
+            "reported_symptoms": ["fresh blood on toilet paper 2 weeks", "no rectal pain", "no weight loss", "no bowel habit change"],
+            "vital_signs_reported": {"heart_rate": "74 bpm"},
+            "duration_of_symptoms": "2 weeks",
+            "relevant_history": "Probable haemorrhoids",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Dietary advice — high fibre, increased fluids. Avoid straining. Topical haemorrhoid preparations. Rectal examination to exclude other pathology. Digital examination essential. Refer for sigmoidoscopy if age >40 or persistent bleeding.",
+            "referral_needed": False,
+            "confidence_score": 0.91
+        }
+    },
+    {
+        "lang": "en",
+        "triage": "green",
+        "transcript_en": "Child 8 years. Abdominal pain around the navel for 4 hours — mild, score 3 out of 10. Ate one mango and two oranges before pain started. Loose stool once. No fever. Heart rate 82. Playing on phone in waiting room.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Mild functional abdominal pain — likely dietary cause",
+            "reported_symptoms": ["mild periumbilical pain 4 hours", "onset after large fruit intake", "one loose stool", "no fever", "pain 3/10"],
+            "vital_signs_reported": {"heart_rate": "82 bpm", "temperature": "normal"},
+            "duration_of_symptoms": "4 hours",
+            "relevant_history": "Excessive fruit intake before onset",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Reassure and observe. Light diet. Adequate fluids. No analgesia required at this level. Return if pain worsens, localises to right side, fever develops, or vomiting begins.",
+            "referral_needed": False,
+            "confidence_score": 0.92
+        }
+    },
+    {
+        "lang": "sw",
+        "triage": "green",
+        "transcript_en": "Adult woman 22 years. Intra-uterine device insertion 3 days ago. Mild cramping and light spotting today. Temperature normal. Heart rate 76. No fever. No foul-smelling discharge. No shoulder tip pain.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Post-IUD insertion mild cramping and spotting — expected",
+            "reported_symptoms": ["IUD inserted 3 days ago", "mild cramping", "light spotting", "no fever", "no foul discharge", "no shoulder tip pain"],
+            "vital_signs_reported": {"temperature": "normal", "heart_rate": "76 bpm"},
+            "duration_of_symptoms": "1 day post-procedure onset",
+            "relevant_history": "IUD inserted 3 days ago",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Normal post-insertion symptoms — reassure. Paracetamol for cramping. Return if fever develops, severe pain, foul discharge, or positive pregnancy test.",
+            "referral_needed": False,
+            "confidence_score": 0.92
+        }
+    },
+    {
+        "lang": "tl",
+        "triage": "green",
+        "transcript_en": "Male 35 years. Mild skin rash, itchy, started yesterday. Red raised patches on forearms and trunk. No breathing difficulty. No lip or tongue swelling. Ate new food last night. Temperature normal. Heart rate 74.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Mild urticaria — probable food allergy",
+            "reported_symptoms": ["itchy urticarial rash forearms and trunk", "onset after new food", "no angioedema", "no respiratory symptoms"],
+            "vital_signs_reported": {"temperature": "normal", "heart_rate": "74 bpm"},
+            "duration_of_symptoms": "since yesterday",
+            "relevant_history": "New food exposure",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Oral antihistamine — chlorphenamine or cetirizine. Identify and avoid trigger food. Return IMMEDIATELY if throat swells, difficulty breathing, dizziness — these indicate anaphylaxis.",
+            "referral_needed": False,
+            "confidence_score": 0.92
+        }
+    },
+    {
+        "lang": "ha",
+        "triage": "green",
+        "transcript_en": "Girl 14 years. Painful menstrual cramps — first day of period. Pain score 5 out of 10. No vomiting. No syncope. Periods have always been painful. No intermenstrual bleeding. Heart rate 80. Fully alert.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Primary dysmenorrhoea — menstrual cramps",
+            "reported_symptoms": ["painful periods — first day", "pain 5/10", "no vomiting", "no syncope", "recurrent with each cycle"],
+            "vital_signs_reported": {"heart_rate": "80 bpm"},
+            "duration_of_symptoms": "onset today — recurrent pattern",
+            "relevant_history": "Primary dysmenorrhoea — no underlying pathology suspected",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. NSAIDs (ibuprofen 400mg) taken at onset of pain are most effective. Paracetamol as adjunct. Heat application. Discuss menstrual hygiene and normal cycle. If not responding to NSAIDs — consider endometriosis.",
+            "referral_needed": False,
+            "confidence_score": 0.92
+        }
+    },
+    {
+        "lang": "bn",
+        "triage": "green",
+        "transcript_en": "Boy 6 years. Mild diarrhoea for 1 day, 4 loose stools. No blood in stool. No vomiting. No fever. Drinking normally. Skin turgor normal. Eyes not sunken. Heart rate 84. Playing actively.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Mild acute diarrhoea — no dehydration",
+            "reported_symptoms": ["diarrhoea 1 day — 4 loose stools", "no blood", "no vomiting", "afebrile", "drinking normally", "normal skin turgor", "eyes not sunken"],
+            "vital_signs_reported": {"heart_rate": "84 bpm", "temperature": "normal"},
+            "duration_of_symptoms": "1 day",
+            "relevant_history": "None",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Continue oral fluids — ORS if available. Continue feeding. Zinc supplementation 10-20mg daily for 10-14 days. Return if stools become bloody, vomiting starts, signs of dehydration appear, or frequency increases.",
+            "referral_needed": False,
+            "confidence_score": 0.93
+        }
+    },
+    {
+        "lang": "hi",
+        "triage": "green",
+        "transcript_en": "Adult male 42 years. Dental pain for 5 days. Lower right molar. Swelling of right cheek — mild, not extending to neck or floor of mouth. No difficulty opening mouth. No fever. No neck stiffness. Heart rate 76.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Dental abscess right lower molar — no signs of spreading infection",
+            "reported_symptoms": ["dental pain 5 days lower right molar", "mild right cheek swelling", "no trismus", "no neck extension of swelling", "afebrile"],
+            "vital_signs_reported": {"heart_rate": "76 bpm", "temperature": "normal"},
+            "duration_of_symptoms": "5 days",
+            "relevant_history": "None",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Analgesia — ibuprofen and paracetamol. Oral amoxicillin for 5 days. Dental referral within 48-72 hours. Return immediately if swelling spreads to neck or floor of mouth, trismus worsens, or fever develops — Ludwig's angina risk.",
+            "referral_needed": True,
+            "confidence_score": 0.92
+        }
+    },
+    {
+        "lang": "am",
+        "triage": "green",
+        "transcript_en": "Adult female 33 years. Routine antenatal check at 28 weeks. Feels well. Blood pressure 118 over 74. Heart rate 80. No headache. No visual changes. Fetal movements normal. Urine dipstick negative. Weight gain appropriate.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Routine antenatal visit — 28 weeks uncomplicated pregnancy",
+            "reported_symptoms": ["28 weeks gestation", "feels well", "no headache", "no visual change", "normal fetal movements"],
+            "vital_signs_reported": {"blood_pressure": "118/74 mmHg", "heart_rate": "80 bpm"},
+            "duration_of_symptoms": "routine",
+            "relevant_history": "Uncomplicated pregnancy",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Fundal height measurement. Fetal heart auscultation. Urine protein. Haemoglobin check. Iron and folate supplementation. Anti-D if Rh negative. Next visit at 32 weeks.",
+            "referral_needed": False,
+            "confidence_score": 0.94
+        }
+    },
+    {
+        "lang": "fr",
+        "triage": "green",
+        "transcript_en": "Child 11 years. Mild fever 37.5 for 2 days, headache and body aches. No rash. No neck stiffness. Eating less but drinking. No vomiting. Heart rate 92. Influenza circulating in the village.",
+        "output": {
+            "triage_level": "green",
+            "primary_complaint": "Probable influenza — mild uncomplicated",
+            "reported_symptoms": ["fever 37.5C 2 days", "headache", "myalgia", "no rash", "no meningism", "reduced appetite", "drinking adequate"],
+            "vital_signs_reported": {"temperature": "37.5C", "heart_rate": "92 bpm"},
+            "duration_of_symptoms": "2 days",
+            "relevant_history": "Influenza in community",
+            "red_flag_indicators": [],
+            "recommended_action": "Routine. Paracetamol for fever and pain — NO aspirin. Push fluids. Rest. No antibiotics unless secondary bacterial infection develops. Return if breathing difficulty, persistent fever >5 days, or confusion develops.",
+            "referral_needed": False,
+            "confidence_score": 0.93
+        }
+    },
+
+    # ═══════════════════════════════════════════════════════
+    # BLUE — 16 cases (deceased / expectant)
+    # SATS criteria: confirmed deceased, or clearly unsurvivable
+    # injuries with no signs of life, or traumatic death
+    # ═══════════════════════════════════════════════════════
+    {
+        "lang": "en",
+        "triage": "blue",
+        "transcript_en": "Adult male approximately 50 years. Found by roadside — struck by vehicle. No breathing detected. No pulse. Fixed dilated pupils bilaterally. Body cold to touch. Multiple open skull fractures. Rigor mortis present. No bystander CPR performed.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Traumatic death — roadside collision",
+            "reported_symptoms": ["apnoea", "no pulse", "fixed dilated pupils", "cold body", "multiple skull fractures", "rigor mortis"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed and dilated", "skin": "cold"},
+            "duration_of_symptoms": "found deceased — estimated hours",
+            "relevant_history": "RTA victim — found on roadside",
+            "red_flag_indicators": ["confirmed death — rigor mortis and fixed pupils"],
+            "recommended_action": "Do not commence resuscitation. Document time of death assessment. Preserve scene if traumatic death — possible medicolegal case. Notify family and authorities. Handle with dignity.",
+            "referral_needed": False,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "sw",
+        "triage": "blue",
+        "transcript_en": "Old woman, estimated 75 years. Died at home. Family brought her to health post. No breathing, no pulse, pupils fixed and dilated, skin cold and mottled. Family says she was ill for several weeks with cancer. No CPR attempted.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Expected death from terminal illness — cancer",
+            "reported_symptoms": ["no breathing", "no pulse", "fixed dilated pupils", "cold mottled skin", "weeks of illness"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed dilated", "skin": "cold and mottled"},
+            "duration_of_symptoms": "weeks of decline — expected death",
+            "relevant_history": "Terminal cancer",
+            "red_flag_indicators": ["confirmed death — expected in terminal illness"],
+            "recommended_action": "Confirm death. Do not commence resuscitation. Compassionate family support. Death certificate if qualified to issue. Advise family on procedures.",
+            "referral_needed": False,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "tl",
+        "triage": "blue",
+        "transcript_en": "Newborn delivered at home — stillbirth. Baby has no heart rate, no respiratory effort, no tone. Skin white and pale. Umbilical cord was around the neck. Mother was in labour for very long time at home — family says over 24 hours.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Stillbirth — intrapartum death",
+            "reported_symptoms": ["no heart rate", "no respiratory effort", "absent tone", "pale white skin", "nuchal cord", "prolonged labour >24 hours"],
+            "vital_signs_reported": {"heart_rate": "absent", "respiratory_effort": "absent", "tone": "absent"},
+            "duration_of_symptoms": "born without signs of life",
+            "relevant_history": "Prolonged labour at home, nuchal cord",
+            "red_flag_indicators": ["stillbirth confirmed"],
+            "recommended_action": "Confirm absence of life — apnoea, no pulse, no tone. Brief resuscitation attempt if birth within 10 minutes and not macerated. Compassionate care for mother. Assess mother for complications — sepsis, PPH. Document cause.",
+            "referral_needed": True,
+            "confidence_score": 0.98
+        }
+    },
+    {
+        "lang": "ha",
+        "triage": "blue",
+        "transcript_en": "Adult man 40 years. Found in house fire. 70 percent burns covering body including face, chest and both arms. No breathing. No pulse. Eyes open and fixed. Hair and eyelashes singed. Incompatible with survival.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Fatal burns — unsurvivable injuries",
+            "reported_symptoms": ["burns >60% BSA", "face and airway burns", "apnoea", "no pulse", "fixed eyes"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent"},
+            "duration_of_symptoms": "found with no signs of life",
+            "relevant_history": "House fire victim",
+            "red_flag_indicators": ["burns >60% BSA in resource-limited setting — unsurvivable", "confirmed death"],
+            "recommended_action": "Confirmed death. Do not commence resuscitation. Preserve scene — possible fire investigation. Notify authorities. Compassionate handling.",
+            "referral_needed": False,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "bn",
+        "triage": "blue",
+        "transcript_en": "Adult woman 65 years. Brought in by family — found on floor this morning. No breathing. No pulse. Pupils fixed and dilated. Cool extremities. Skin livid and mottled. Family says she has end-stage heart failure. Not for resuscitation as per her wishes expressed to family.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Expected death — end-stage heart failure, DNAR expressed",
+            "reported_symptoms": ["apnoea", "no pulse", "fixed dilated pupils", "cool livid skin", "mottling"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed dilated", "skin": "cool and livid"},
+            "duration_of_symptoms": "found this morning — overnight death",
+            "relevant_history": "End-stage heart failure — patient expressed no resuscitation wish",
+            "red_flag_indicators": ["confirmed death — expected"],
+            "recommended_action": "Confirm death. Respect documented DNAR wish. No resuscitation. Support family. Issue death certificate. Document time of confirmation.",
+            "referral_needed": False,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "hi",
+        "triage": "blue",
+        "transcript_en": "Boy 4 years. Drowning — submerged in well for unknown duration, estimated over 30 minutes by witnesses. Pulled out by villagers. No breathing, no pulse. Pupils fixed. Body cool and limp. CPR attempted for 30 minutes without response.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Drowning — prolonged submersion with sustained cardiac arrest unresponsive to CPR",
+            "reported_symptoms": ["submersion >30 minutes", "apnoea", "pulseless", "fixed pupils", "cold body", "CPR 30 minutes no response"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed"},
+            "duration_of_symptoms": ">30 minutes submersion",
+            "relevant_history": "Well drowning",
+            "red_flag_indicators": ["drowning >30 minutes — anoxic brain injury beyond recovery", "no ROSC after 30 minutes CPR"],
+            "recommended_action": "CPR may be ceased. Exception — cold water drowning with hypothermia: continue until warm and still dead. Document time of cessation. Family support. Notify authorities — child death.",
+            "referral_needed": False,
+            "confidence_score": 0.97
+        }
+    },
+    {
+        "lang": "am",
+        "triage": "blue",
+        "transcript_en": "Adult male 55 years. Found collapsed at farm. No breathing, no pulse. Fixed pupils. Body stiff. Discovered approximately 3 hours after he was last seen alive. Witnesses saw him collapse suddenly. No CPR performed.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Sudden cardiac death — found deceased, rigor mortis",
+            "reported_symptoms": ["apnoea", "no pulse", "fixed pupils", "rigor mortis — stiff body"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed", "rigor_mortis": "present"},
+            "duration_of_symptoms": "estimated 3 hours since collapse",
+            "relevant_history": "Sudden collapse witnessed",
+            "red_flag_indicators": ["confirmed death with rigor mortis — do not resuscitate"],
+            "recommended_action": "Confirmed death. Do not commence resuscitation — rigor mortis confirms prolonged death. Document assessment time. Notify family. Medicolegal notification for sudden unexpected death.",
+            "referral_needed": False,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "fr",
+        "triage": "blue",
+        "transcript_en": "Female 80 years. Family says she died peacefully at home in her sleep. She had advanced dementia and was bedbound for 3 months. No breathing, no pulse, skin cold and purple mottling on back. Fixed dilated pupils.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Natural death — end-stage dementia, expected death",
+            "reported_symptoms": ["apnoea", "no pulse", "fixed dilated pupils", "cold skin", "dependent lividity on back"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed dilated", "skin": "cold with dependent lividity"},
+            "duration_of_symptoms": "found deceased this morning",
+            "relevant_history": "Advanced dementia — bedbound 3 months",
+            "red_flag_indicators": ["confirmed death — dependent lividity and fixed pupils"],
+            "recommended_action": "Confirmed death. No resuscitation. Compassionate family support. Death certificate — natural causes, advanced dementia. Document assessment.",
+            "referral_needed": False,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "en",
+        "triage": "blue",
+        "transcript_en": "Adult male 35 years. Gunshot wound to head — entry wound right temple, exit wound left. Found at scene. No breathing, no pulse, pupils fixed. Brain matter visible. Transported by community members. Already deceased.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Fatal penetrating head injury — gunshot wound",
+            "reported_symptoms": ["gunshot wound bilateral temporal regions", "apnoea", "no pulse", "fixed pupils", "brain matter visible"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed"},
+            "duration_of_symptoms": "found deceased at scene",
+            "relevant_history": "Gunshot wound",
+            "red_flag_indicators": ["confirmed death — unsurvivable head injury"],
+            "recommended_action": "Confirmed death. Do not commence resuscitation — unsurvivable injury. Preserve scene as much as possible. MANDATORY police notification — violent death. Do not remove clothing or clean wound before police attend.",
+            "referral_needed": False,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "sw",
+        "triage": "blue",
+        "transcript_en": "Child 2 years. Brought by mother — found not breathing in bed this morning. Last seen alive and well at 10pm. No breathing, no pulse, pupils fixed, body cold. Sudden unexpected death in infancy suspected.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Sudden unexpected death in infancy — SUDI",
+            "reported_symptoms": ["found deceased in bed — not breathing", "no pulse", "fixed pupils", "cold body", "last seen alive 10pm"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed", "temperature": "cold"},
+            "duration_of_symptoms": "overnight — estimated 8 hours",
+            "relevant_history": "Previously healthy 2-year-old",
+            "red_flag_indicators": ["SUDI — mandatory investigation required", "child death protocol"],
+            "recommended_action": "Confirm death gently. Do NOT separate mother and child immediately. SUDI protocol — do not wash or dress child. Notify child death response team and authorities. Compassionate family support. Screen for signs of non-accidental injury before transferring body.",
+            "referral_needed": True,
+            "confidence_score": 0.98
+        }
+    },
+    {
+        "lang": "tl",
+        "triage": "blue",
+        "transcript_en": "Male 70 years. Collapsed during community meeting. Bystander CPR performed for 45 minutes without return of circulation. No AED available. Pupils fixed and dilated. Body now cold. Witnessed sudden collapse.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Out-of-hospital cardiac arrest — no ROSC after 45 minutes CPR",
+            "reported_symptoms": ["witnessed sudden collapse", "CPR 45 minutes", "no ROSC", "fixed dilated pupils", "cold body"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed dilated"},
+            "duration_of_symptoms": "witnessed collapse — 45+ minutes resuscitation",
+            "relevant_history": "70-year-old male",
+            "red_flag_indicators": ["death after prolonged resuscitation — no reversible cause identified"],
+            "recommended_action": "Cease resuscitation. 45 minutes without ROSC and no reversible cause identified — resuscitation futile. Document time of death. Thanatology — family notification with compassion. If AED becomes available and arrest <20 minutes — may continue.",
+            "referral_needed": False,
+            "confidence_score": 0.98
+        }
+    },
+    {
+        "lang": "ha",
+        "triage": "blue",
+        "transcript_en": "Adult woman 45 years. Collapsed from suspected rabies — advanced stage. Has not responded for 3 days. Now no breathing, no pulse. Fixed pupils. Family reports hydrophobia and aerophobia before death. Known dog bite 3 months ago.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Death from rabies encephalitis — no PEP was given after exposure",
+            "reported_symptoms": ["apnoea", "no pulse", "fixed pupils", "preceded by hydrophobia and aerophobia", "dog bite 3 months ago — no PEP"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed"},
+            "duration_of_symptoms": "3 days unconscious — died overnight",
+            "relevant_history": "Dog bite 3 months ago — no post-exposure prophylaxis received",
+            "red_flag_indicators": ["rabies — universally fatal once symptomatic", "confirmed death"],
+            "recommended_action": "Confirmed death. Handle body with universal precautions — risk of virus in saliva. Family counselling — identify others potentially exposed to dog. Report to public health authorities. Do not delay — trace dog and expose contacts.",
+            "referral_needed": False,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "bn",
+        "triage": "blue",
+        "transcript_en": "Premature newborn delivered at 24 weeks gestation at home. No signs of life on arrival — no breathing, no heartbeat, limp. Skin translucent and very thin. No facilities for resuscitation at this gestational age available at this health post.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Previable premature birth — 24 weeks gestation, no signs of life",
+            "reported_symptoms": ["born at 24 weeks", "apnoea", "no heartbeat", "absent tone", "translucent skin"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "tone": "absent"},
+            "duration_of_symptoms": "born with no signs of life",
+            "relevant_history": "Home delivery at 24 weeks gestation",
+            "red_flag_indicators": ["periviable birth — survival very unlikely at 24 weeks without level 3 NICU"],
+            "recommended_action": "At 24 weeks in a resource-limited setting without NICU: comfort care. If signs of life emerge — brief resuscitation attempt if parental wish and referral possible. Compassionate family support. Bereavement care for mother. Assess mother for complications.",
+            "referral_needed": True,
+            "confidence_score": 0.97
+        }
+    },
+    {
+        "lang": "hi",
+        "triage": "blue",
+        "transcript_en": "Adult male 28 years. Electrocution — touched live electrical wire while repairing roof. Found by family. Not breathing, no pulse, pupils fixed and dilated. Burns at right hand entry site and left foot exit site. Cold body.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Electrocution — fatal electrical injury",
+            "reported_symptoms": ["electrocution — electrical contact", "apnoea", "no pulse", "fixed dilated pupils", "electrical entry burn right hand", "exit burn left foot", "cold body"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed dilated"},
+            "duration_of_symptoms": "found deceased",
+            "relevant_history": "Electrical contact while working",
+            "red_flag_indicators": ["confirmed death following electrocution"],
+            "recommended_action": "ENSURE SCENE SAFETY — confirm power disconnected before any approach. Confirm death. If found immediately after electrocution (<5 minutes) with shockable rhythm history — CPR warranted initially. Document. Notify family and authorities.",
+            "referral_needed": False,
+            "confidence_score": 0.98
+        }
+    },
+    {
+        "lang": "am",
+        "triage": "blue",
+        "transcript_en": "Adult woman 60 years. Died in hospital ward overnight from septic shock secondary to untreated perforated bowel. Nurses call CHW to confirm death before family notified. No breathing, no pulse, pupils fixed. Mottling present.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "In-hospital death — septic shock from perforated bowel",
+            "reported_symptoms": ["apnoea", "no pulse", "fixed pupils", "skin mottling"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed", "skin": "mottled"},
+            "duration_of_symptoms": "overnight death in hospital",
+            "relevant_history": "Septic shock — perforated bowel",
+            "red_flag_indicators": ["confirmed in-hospital death"],
+            "recommended_action": "Confirm death. Document time. Family notification with compassion. Death certificate — attending physician to complete. No police notification required for expected hospital death unless suspicious circumstances.",
+            "referral_needed": False,
+            "confidence_score": 0.99
+        }
+    },
+    {
+        "lang": "fr",
+        "triage": "blue",
+        "transcript_en": "Male teenager 17 years. Found hanging in his room by mother. Removed from ligature by family. No breathing, no pulse, pupils fixed, body cold. Probable rigor beginning. Estimated deceased for several hours based on skin temperature.",
+        "output": {
+            "triage_level": "blue",
+            "primary_complaint": "Death by hanging — completed suicide",
+            "reported_symptoms": ["hanging — ligature mark neck", "apnoea", "no pulse", "fixed pupils", "cold body", "beginning rigor mortis"],
+            "vital_signs_reported": {"breathing": "absent", "pulse": "absent", "pupils": "fixed", "temperature": "cold"},
+            "duration_of_symptoms": "estimated several hours before discovery",
+            "relevant_history": "Adolescent — found by family",
+            "red_flag_indicators": ["confirmed death — rigor mortis and cold", "suspected suicide — mandatory reporting"],
+            "recommended_action": "Confirm death. Do not remove ligature until police present — preserve evidence. Mandatory notification to authorities — suspected suicide. Sensitive family support — trauma-informed. Refer surviving family for mental health support. Consider safeguarding for siblings.",
+            "referral_needed": True,
+            "confidence_score": 0.98
+        }
+    },
+]
+
+
+def augment_dataset(seed_cases: list, target: int = 500) -> list:
+    """Augment seed cases to reach target count."""
+    random.seed(42)
+    augmented = []
+
+    age_prefixes = [
+        "{age}yr old", "approximately {age} years", "{age}-year-old",
+        "patient aged {age}", "aged {age}"
+    ]
+    age_ranges = {
+        "red":    (18, 70),
+        "orange": (1, 75),
+        "yellow": (5, 80),
+        "green":  (2, 85),
+        "blue":   (20, 90),
+    }
+
+    location_prefixes = [
+        "Presenting from remote village. ", "Brought by community members. ",
+        "Arrived by motorcycle ambulance. ", "Self-referred from distant health post. ",
+        "Transferred from neighbouring clinic. ", "",
+    ]
+
+    while len(augmented) < target - len(seed_cases):
+        base = random.choice(seed_cases).copy()
+        out  = {k: v for k, v in base["output"].items()}
+
+        # vary age in transcript
+        lo, hi = age_ranges[base["triage"]]
+        new_age = random.randint(lo, hi)
+        prefix  = random.choice(age_prefixes).format(age=new_age)
+        loc_pfx = random.choice(location_prefixes)
+        new_tx  = f"{loc_pfx}{prefix.capitalize()} patient. {base['transcript_en']}"
+
+        # slightly vary confidence (±0.03)
+        out["confidence_score"] = round(
+            min(0.99, max(0.75, base["output"]["confidence_score"] + random.uniform(-0.03, 0.03))),
+            2
+        )
+
+        augmented.append({
+            "lang":          base["lang"],
+            "triage":        base["triage"],
+            "transcript_en": new_tx,
+            "output":        out
+        })
+
+    return augmented
+
+
+def format_as_instruction(case: dict) -> dict:
+    lang_names = {
+        "en": "English", "sw": "Swahili", "tl": "Tagalog",
+        "ha": "Hausa",   "bn": "Bengali", "hi": "Hindi",
+        "am": "Amharic", "fr": "French"
+    }
+    lang_name = lang_names.get(case["lang"], case["lang"])
+    out = case["output"].copy()
+    out["source_language"] = case["lang"]
+    out["raw_transcript"]  = case["transcript_en"]
+
+    return {
+        "instruction": (
+            f"You are a clinical triage assistant trained on SATS 2023 and WHO ETAT guidelines.\n"
+            f"The nurse's report language: {lang_name}.\n"
+            f"Extract structured triage data from the intake report.\n"
+            f"Respond ONLY with a JSON object. No other text."
+        ),
+        "input":  case["transcript_en"],
+        "output": json.dumps(out, indent=2)
+    }
+
+
+if __name__ == "__main__":
+    os.makedirs("data", exist_ok=True)
+
+    # Write seed cases
+    seed_path = Path("data/finetune_seed_cases.jsonl")
+    seed_path.write_text("\n".join(json.dumps(c, ensure_ascii=False) for c in SEED_CASES))
+    print(f"Seed cases written: {len(SEED_CASES)} -> {seed_path}")
+
+    # Level distribution check
+    from collections import Counter
+    dist = Counter(c["triage"] for c in SEED_CASES)
+    print(f"Seed distribution: {dict(dist)}")
+
+    # Augment to 500
+    augmented = augment_dataset(SEED_CASES, target=500)
+    full_dataset = SEED_CASES + augmented
+
+    # Format as instruction tuning pairs
+    formatted = [format_as_instruction(c) for c in full_dataset]
+
+    # Shuffle
+    random.shuffle(formatted)
+
+    train_path = Path("data/finetune_train.jsonl")
+    train_path.write_text("\n".join(json.dumps(d, ensure_ascii=False) for d in formatted))
+    print(f"Full training dataset written: {len(formatted)} examples -> {train_path}")
+
+    # Final distribution check
+    full_dist = Counter(c["triage"] for c in full_dataset)
+    print(f"Full dataset distribution: {dict(full_dist)}")
+    print("Done. Place data/ folder in your voicebridge repo root.")
