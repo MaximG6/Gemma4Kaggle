@@ -27,11 +27,11 @@ def main() -> int:
     print(f"Loading processor from {MODEL_DIR} ...")
     processor = AutoProcessor.from_pretrained(str(MODEL_DIR))
 
-    print("Loading model (bfloat16, device_map=auto) ...")
+    print("Loading model (float32, CPU) ...")
     model = Gemma4ForConditionalGeneration.from_pretrained(
         str(MODEL_DIR),
-        torch_dtype=torch.bfloat16,
-        device_map="auto",
+        torch_dtype=torch.float32,
+        device_map="cpu",
     )
     model.eval()
 
@@ -43,7 +43,7 @@ def main() -> int:
         sampling_rate=16000,
         text="Transcribe this audio.",
         return_tensors="pt",
-    ).to("cuda")
+    )  # stays on CPU
 
     print("Running inference ...")
     with torch.inference_mode():

@@ -10,7 +10,7 @@ complete 6-phase plan with all tasks, code samples, and timestamps.
 Always refer back to it when deciding what to build next.
 
 ## Current phase
-Phase 1 — Task 1.2 (scripts written; awaiting model download + smoke test)
+Phase 1 — Tasks 1.3 and 1.4 complete; ready for Phase 2
 
 ## Stack
 - Python 3.11, FastAPI, uvicorn
@@ -28,4 +28,4 @@ Phase 1 — Task 1.2 (scripts written; awaiting model download + smoke test)
 - Target latency under 8 seconds on Pi 5 for a 10-second audio clip
 
 ## Active task
-Task 1.2 — Download and smoke-test Gemma 4 E4B
+Phase 2 — Task 2.1 (Gemma 4 transcription wrapper)
