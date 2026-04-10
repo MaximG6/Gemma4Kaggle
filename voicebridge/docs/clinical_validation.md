@@ -348,30 +348,36 @@ Triage accuracy figures in benchmark results are based on 500 synthetic training
 and 20 synthetic test cases. The model has not been validated on real patient encounters.
 Any deployment in clinical settings requires prospective validation with real patient data.
 
-**11.2 Vital Signs May Not Be Reported**
+**11.2 Error Direction — Over-Triage Only**
+All 5 misclassifications in the Phase 3.3 benchmark were over-triage errors (system
+assigned higher urgency than ground truth). In a clinical context over-triage is the
+preferred failure mode — it results in a patient receiving more attention than strictly
+necessary rather than being under-served.
+
+**11.3 Vital Signs May Not Be Reported**
 VoiceBridge extracts vital signs from spoken narrative. If the nurse does not state a
 vital sign, it will not appear in the output. The rule-based validator cannot calculate
 a TEWS without reported values. The LLM classifier may still infer triage level from
 clinical narrative alone.
 
-**11.3 Chronic Illness Caveat**
+**11.4 Chronic Illness Caveat**
 Patients with TB, HIV/AIDS, or other chronic conditions may have chronically abnormal
 baseline vital signs. A patient with pulmonary TB may have a high RR at rest not
 indicating acute emergency. The SATS training manual explicitly notes these patients
 may be over-triaged by TEWS alone. Senior clinician review is required for known
 chronically unwell patients.
 
-**11.4 LLM Confidence Score Is Not a Clinical Certainty Score**
+**11.5 LLM Confidence Score Is Not a Clinical Certainty Score**
 The `confidence_score` field reflects the LLM's output token probability distribution,
 not clinical certainty. A high confidence score does not mean the triage assignment is
 clinically correct. The field should be treated as an internal quality indicator only.
 
-**11.5 Paediatric Patients**
+**11.6 Paediatric Patients**
 This implementation uses the adult TEWS only (patients > 12 years or > 150 cm). The
 paediatric SATS uses different vital sign ranges. VoiceBridge should not be used to
 triage infants or young children without a paediatric TEWS extension.
 
-**11.6 Audio Quality**
+**11.7 Audio Quality**
 Transcription accuracy degrades with background noise, strong accents, and poor
 microphone quality. Audio quality below a signal-to-noise ratio of approximately 15dB
 may produce unreliable transcripts and therefore unreliable triage output.

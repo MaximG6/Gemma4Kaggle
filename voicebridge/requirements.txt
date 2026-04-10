@@ -10,5 +10,6 @@ reportlab
 langdetect
 pytest
 pytest-anyio
+matplotlib
 transformers
 accelerate
