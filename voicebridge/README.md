@@ -30,10 +30,12 @@ voicebridge/
 ├── api/          # FastAPI backend
 ├── models/       # Model loading and inference wrappers
 ├── pipeline/     # Audio → transcript → triage logic
+├── dashboard/    # Supervisor triage dashboard (index.html)
 ├── frontend/     # HTML/JS UI + service worker
-├── scripts/      # Benchmarking, fine-tune prep, quantisation
+├── scripts/      # finetune.py, benchmark.py, compare_models.py, quantise.py
 ├── data/         # Triage schema, language lists, SATS mappings
-├── docs/         # Writeup, diagrams, benchmark results
+├── docs/         # Writeup, diagrams, model_comparison.md
+├── runs/         # Training logs and configs
 ├── tests/        # Unit and integration tests
 └── docker/       # Dockerfile for reproducible demo
 ```
@@ -99,6 +101,19 @@ Swahili, Tagalog, Hausa, Bengali, Hindi, Urdu, Amharic, Yoruba, Igbo, French, Po
 
 ---
 
+## Fine-tuned Model
+
+| Asset | Location |
+|-------|----------|
+| Merged model (HF format) | [OminousDude/voicebridge-gemma4](https://huggingface.co/OminousDude/voicebridge-gemma4) |
+| LoRA adapter only | [OminousDude/voicebridge-adapter](https://huggingface.co/OminousDude/voicebridge-adapter) |
+| GGUF Q4_K_M (Pi 5 deploy) | `voicebridge-q4km.gguf` in the merged model repo |
+
+Training: 500 examples, 2 epochs, LoRA r=32, Unsloth QLoRA on RTX 5090.
+Train loss: 0.181 → Eval loss: 1.565. Best checkpoint saved automatically.
+
+---
+
 ## Milestones
 
 | Date | Milestone |
@@ -106,7 +121,7 @@ Swahili, Tagalog, Hausa, Bengali, Hindi, Urdu, Amharic, Yoruba, Igbo, French, Po
 | Apr 13 | Environment setup complete — model running and smoke-tested |
 | Apr 20 | Core pipeline working end-to-end: audio in, triage JSON out, PDF generated |
 | Apr 27 | Clinical validation doc complete, NGO outreach emails sent |
-| May 4  | LoRA fine-tune complete, benchmark suite run |
+| May 4  | LoRA fine-tune complete, benchmark suite run, GGUF quantised ✅ |
 | May 11 | Demo video filmed and edited, technical writeup drafted |
 | May 17 | Final submission submitted |
 
