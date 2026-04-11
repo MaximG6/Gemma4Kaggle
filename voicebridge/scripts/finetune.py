@@ -435,15 +435,13 @@ def run_finetune(cfg: dict) -> None:
     # ── Save merged (adapter + base weights fused) ─────────────────────────
     if not cfg.get("dry_run"):
         _tick(f"\nSaving merged model → {cfg['merged_output']}\n"
-              f"  (fusing LoRA weights into base — may take several minutes)")
-        merged_model = model.merge_and_unload()
-        merged_model.save_pretrained(
+              f"  (fusing + dequantising LoRA weights to fp16 — may take several minutes)")
+        model.save_pretrained_merged(
             cfg["merged_output"],
-            safe_serialization=True,
-            max_shard_size="4GB",
+            tokenizer,
+            save_method = "merged_16bit",
         )
-        tokenizer.save_pretrained(cfg["merged_output"])
-        _tick("  Merged model saved.")
+        _tick("  Merged model saved (fp16, GGUF-ready).")
     else:
         _tick("  [dry-run] Skipping merged model save.")
         _tick("\n[dry-run] Testing inference on one example...")
@@ -558,16 +556,15 @@ def run_merge_only(cfg: dict) -> None:
     )
     _tick("  Model loaded.")
 
-    _tick(f"\nFusing LoRA weights → {merged_path}\n"
-          f"  (may take several minutes)")
-    merged_model = model.merge_and_unload()
-    merged_model.save_pretrained(
-        merged_path,
-        safe_serialization = True,
-        max_shard_size     = "4GB",
+    gguf_path = str(Path(merged_path).parent / "voicebridge-q4km.gguf")
+    _tick(f"\nSaving directly to GGUF Q4_K_M → {gguf_path}\n"
+          f"  (bypasses fp16 intermediate — less RAM required)")
+    model.save_pretrained_gguf(
+        str(Path(merged_path).parent / "voicebridge"),
+        tokenizer,
+        quantization_method = "q4_k_m",
     )
-    tokenizer.save_pretrained(merged_path)
-    _tick("  Merged model saved.")
+    _tick(f"  GGUF saved → {gguf_path}")
 
 
 if __name__ == "__main__":
