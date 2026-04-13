@@ -17,6 +17,9 @@ import os
 import sys
 from pathlib import Path
 
+# Disable xet backend before any HuggingFace import
+os.environ["HF_HUB_DISABLE_XET"] = "1"
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -89,9 +92,15 @@ def main() -> None:
         quantization_method = "q4_k_m",
     )
 
+    # Unsloth may produce a slightly different filename — find whatever .gguf was created
     if not gguf_file.exists():
-        print(f"[ERROR] Expected GGUF not found at {gguf_file}", file=sys.stderr)
-        sys.exit(1)
+        candidates = list(gguf_dir.glob("*.gguf"))
+        if not candidates:
+            print(f"[ERROR] No GGUF file found in {gguf_dir}", file=sys.stderr)
+            sys.exit(1)
+        # Pick the most recently modified one
+        gguf_file = max(candidates, key=lambda p: p.stat().st_mtime)
+        print(f"      (actual GGUF filename: {gguf_file.name})", flush=True)
 
     size_gb = gguf_file.stat().st_size / (1024 ** 3)
     print(f"      GGUF saved  — {size_gb:.2f} GB", flush=True)
@@ -102,7 +111,6 @@ def main() -> None:
 
     # ── Step 3: Upload to HuggingFace ───────────────────────────────────────
     print(f"\n[3/3] Uploading to HuggingFace: {args.hf_repo} …", flush=True)
-    os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
     from huggingface_hub import HfApi
     api = HfApi()

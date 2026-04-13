@@ -25,7 +25,7 @@
   "dataset_path": "/mnt/c/Users/Maxim/.openclaw/workspace/Gemma4Kaggle/voicebridge/data/finetune_train.jsonl",
   "dataset_size": 500,
   "adapter_output_path": "/mnt/c/Users/Maxim/.openclaw/workspace/Gemma4Kaggle/voicebridge/models/voicebridge-gemma4-triage-adapter",
-  "merged_output_path": "/home/maxim/models/voicebridge-merged",
+  "merged_output_path": "/mnt/c/Users/Maxim/.openclaw/workspace/Gemma4Kaggle/voicebridge/models/voicebridge-merged",
   "hardware_note": "RTX 5090 32GB VRAM, CUDA 12.8, sm_120 (Blackwell)",
-  "run_timestamp": "2026-04-10T23:26:34Z"
+  "run_timestamp": "2026-04-13T16:57:55Z"
 }

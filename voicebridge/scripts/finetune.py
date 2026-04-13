@@ -384,7 +384,7 @@ def run_finetune(cfg: dict) -> None:
         greater_is_better           = False,
         report_to                   = "none",
         seed                        = 42,
-        dataset_text_field          = None,   # dataset is already tokenised
+        dataset_text_field          = "text",
         packing                     = False,
     )
 
