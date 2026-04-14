@@ -1,3 +1,25 @@
-unsloth_compiled_cache/
-voicebridge/unsloth_compiled_cache/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Models and large files
 voicebridge/models/
+*.gguf
+*.safetensors
+
+# Unsloth
+unsloth_compiled_cache/
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Logs and temp files
+*.log
+voicebridge/runs/finetune_log.jsonl
+voicebridge/docs/model_comparison_ckpt.json
+voicebridge/docs/model_comparison_ckpt.tmp
+
+# Environment
+.env
