@@ -45,6 +45,10 @@ sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 from benchmark import TEST_CASES, AccuracyResult, _LEVEL_ORDER, _is_safe, run_accuracy
 from data.clinical_validation import validate_triage
 from pipeline.triage import TriageOutput
+from pipeline.llama_infer import (
+    run_inference, SYSTEM_PROMPT, LANG_NAMES, GPU_LAYERS, THREADS,
+    TEMP, REPEAT_PENALTY, MAX_TOKENS, FINE_GGUF, LLAMA_CLI,
+)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -53,13 +57,6 @@ from pipeline.triage import TriageOutput
 _HOME      = Path.home()
 _LLAMA_CLI = str(_HOME / "llama.cpp" / "build" / "bin" / "llama-cli")
 _CKPT_PATH = _REPO_ROOT / "docs" / "model_comparison_ckpt.json"
-
-GPU_LAYERS     = 99
-THREADS        = 4
-TEMP           = 0.1
-REPEAT_PENALTY = 1.3
-MAX_TOKENS     = 600   # increased to allow full schema output
-
 
 def _find_base_gguf() -> str:
     for root in [
@@ -77,47 +74,6 @@ def _find_base_gguf() -> str:
 
 BASE_GGUF = os.environ.get("BASE_GGUF", _find_base_gguf())
 FINE_GGUF = os.environ.get("FINE_GGUF", str(_HOME / "voicebridge-finetuned-q4km.gguf"))
-
-_LANG_NAMES: dict[str, str] = {
-    "en": "English", "sw": "Swahili", "tl": "Tagalog",
-    "ha": "Hausa",   "bn": "Bengali", "am": "Amharic",
-    "hi": "Hindi",   "fr": "French",
-}
-
-# ---------------------------------------------------------------------------
-# System prompt — enforces exact schema with few-shot examples
-# ---------------------------------------------------------------------------
-
-SYSTEM_PROMPT = """\
-You are a clinical triage assistant trained on SATS 2023 and WHO ETAT guidelines.
-The nurse's report language: {lang_name}.
-Extract structured triage data from the intake report.
-
-You MUST respond with ONLY a single JSON object. No markdown, no code fences, no explanation.
-The JSON MUST use EXACTLY these field names:
-  triage_level        — REQUIRED. Must be exactly one of: red, orange, yellow, green, blue
-  primary_complaint   — REQUIRED. One sentence describing the main clinical problem
-  red_flag_indicators — REQUIRED. Array of strings listing clinical red flags present
-  recommended_action  — REQUIRED. Specific clinical action to take immediately
-  confidence_score    — REQUIRED. Number between 0.0 and 1.0
-
-Triage level definitions:
-  red    = immediately life-threatening, requires resuscitation now
-  orange = very urgent, must be seen within 10 minutes
-  yellow = urgent, must be seen within 1 hour
-  green  = standard queue, can wait up to 4 hours
-  blue   = deceased or expectant (unsurvivable without major resources)
-
-Example 1:
-Input: "Child 2 years. Convulsing for 10 minutes. Unresponsive. High fever."
-Output: {"triage_level": "red", "primary_complaint": "Status epilepticus in a febrile toddler", "red_flag_indicators": ["active seizure >5 min", "AVPU=U", "high fever in child"], "recommended_action": "Immediate airway protection, IV/IO benzodiazepine, measure glucose, prepare cooling measures.", "confidence_score": 0.97}
-
-Example 2:
-Input: "Adult male. Sore throat 2 days, low fever 37.8C, eating normally."
-Output: {"triage_level": "green", "primary_complaint": "Mild upper respiratory tract infection with low-grade fever", "red_flag_indicators": [], "recommended_action": "Standard queue. Throat swab if indicated. Symptomatic treatment.", "confidence_score": 0.91}
-
-Now process the following intake report and output ONLY the JSON object:\
-"""
 
 # ---------------------------------------------------------------------------
 # Checkpoint helpers
@@ -142,45 +98,15 @@ def _save_checkpoint() -> None:
     tmp.replace(_CKPT_PATH)
 
 # ---------------------------------------------------------------------------
-# Prompt builder
-# ---------------------------------------------------------------------------
-
-def _build_prompt(case: dict) -> str:
-    lang_name = _LANG_NAMES.get(case["lang"], "English")
-    system    = SYSTEM_PROMPT.format(lang_name=lang_name)
-    return (
-        f"<start_of_turn>system\n{system}<end_of_turn>\n"
-        f"<start_of_turn>user\n{case['text_en']}<end_of_turn>\n"
-        f"<start_of_turn>model\n{{"
-    )
-
-# ---------------------------------------------------------------------------
 # Output parser
 # ---------------------------------------------------------------------------
 
 def _normalise_level(raw: str) -> Optional[str]:
     if not raw:
         return None
-    raw = raw.lower().strip()
-    if raw in ("red", "orange", "yellow", "green", "blue"):
-        return raw
-    if any(x in raw for x in ("immediate", "critical", "red")):
-        return "red"
-    if any(x in raw for x in ("very urgent", "orange")):
-        return "orange"
-    if "urgent" in raw and "very" not in raw:
-        return "yellow"
-    if "yellow" in raw:
-        return "yellow"
-    if any(x in raw for x in ("standard", "green")):
-        return "green"
-    if any(x in raw for x in ("dead", "deceased", "expectant", "blue")):
-        return "blue"
-    if raw.strip() == "1": return "red"
-    if raw.strip() == "2": return "orange"
-    if raw.strip() == "3": return "yellow"
-    if raw.strip() == "4": return "green"
-    if raw.strip() == "5": return "blue"
+    r = raw.lower().strip()
+    if r in ("red", "orange", "yellow", "green", "blue"):
+        return r
     return None
 
 
@@ -211,7 +137,8 @@ def _parse_triage_level(raw: str) -> Optional[str]:
             pass
 
     # Regex fallback
-    match = re.search(r'"triage_level"\s*:\s*"([^"]+)"', raw, re.IGNORECASE)
+    triage_matches = list(re.finditer(r'"triage_level"\s*:\s*"([^"]+)"', raw, re.IGNORECASE))
+    match = triage_matches[-1] if triage_matches else None
     if match:
         return _normalise_level(match.group(1))
 
@@ -235,71 +162,6 @@ def _extract_json(raw: str) -> Optional[dict]:
         return json.loads(json_str)
     except json.JSONDecodeError:
         return None
-
-# ---------------------------------------------------------------------------
-# Single case inference — GPU via -ngl with shell redirect capture
-# ---------------------------------------------------------------------------
-
-def run_single_case(
-    model_path: str,
-    case: dict,
-    dry_run: bool = False,
-) -> tuple[Optional[str], float, str]:
-    if dry_run:
-        print(f"\n[DRY RUN] Case {case['id']} — expected {case['level']}")
-        return case["level"], 0.0, f'{{"triage_level": "{case["level"]}"}}'
-
-    prompt   = _build_prompt(case)
-    tmp_path = Path(f"/tmp/vb_case_{case['id']}_{os.getpid()}.txt")
-
-    def _quote(s: str) -> str:
-        return "'" + str(s).replace("'", "'\\''") + "'"
-
-    shell_cmd = (
-        " ".join(_quote(c) for c in [
-            _LLAMA_CLI,
-            "-m",  model_path,
-            "-p",  prompt,
-            "-n",  str(MAX_TOKENS),
-            "--threads",        str(THREADS),
-            "--temp",           str(TEMP),
-            "--repeat-penalty", str(REPEAT_PENALTY),
-            "-ngl",             str(GPU_LAYERS),
-            "--single-turn",
-            "--log-disable",
-        ])
-        + f" > {_quote(str(tmp_path))} 2>&1"
-    )
-
-    t0 = time.time()
-    try:
-        subprocess.run(
-            shell_cmd,
-            shell   = True,
-            stdin   = subprocess.DEVNULL,
-            timeout = 120,
-            check   = False,
-        )
-        latency  = time.time() - t0
-        raw_full = tmp_path.read_text(errors="replace").strip()
-        tmp_path.unlink(missing_ok=True)
-
-        # Strip ANSI codes and carriage returns
-        raw_full = re.sub(r'\x1b\[[0-9;]*[mGKHFABCDJK]', '', raw_full)
-        raw_full = re.sub(r'\r', '', raw_full)
-
-        # Extract from first { onward
-        brace = raw_full.find("{")
-        raw   = raw_full[brace:] if brace != -1 else "{}"
-
-    except subprocess.TimeoutExpired:
-        tmp_path.unlink(missing_ok=True)
-        return None, 120.0, "[TIMEOUT]"
-    except Exception as exc:
-        tmp_path.unlink(missing_ok=True)
-        return None, 0.0, f"[ERROR: {exc}]"
-
-    return _parse_triage_level(raw), latency, raw
 
 # ---------------------------------------------------------------------------
 # LlamaClassifier
@@ -337,16 +199,18 @@ class LlamaClassifier:
 
         if case_id in self._cache and not self.no_resume:
             cached    = self._cache[case_id]
-            predicted = cached["predicted"]
+            predicted = cached["predicted"] if not self.dry_run else case["level"]
             latency   = cached["latency"]
             raw       = cached.get("raw", "")
             print(f"  [{self.label}] {case_id} — resumed "
                   f"({_LEVEL_COLOURS.get(predicted, '')}{predicted}{_RESET}, "
                   f"{latency:.1f}s)")
         else:
-            predicted, latency, raw = run_single_case(
-                self.model_path, case, self.dry_run
+            predicted, latency, raw = run_inference(
+                self.model_path, case["text_en"], case["lang"], self.dry_run
             )
+            if self.dry_run:
+                predicted = case["level"]
 
             # ── Print full response ──────────────────────────────────────────
             print(f"\n  ┌─ [{self.label}] {case_id} "
@@ -355,15 +219,17 @@ class LlamaClassifier:
                   f"{'─' * (40 - len(case_id))}")
 
             if raw and raw != "{}":
-                # Pretty-print the JSON if parseable
-                parsed = _extract_json(raw)
+                # Scope to the model's reply (skip typescript header + prompt echo)
+                model_start = raw.rfind("<start_of_turn>model")
+                display_text = raw[model_start:] if model_start != -1 else raw
+                if "[End thinking]" in display_text:
+                    display_text = display_text.split("[End thinking]")[-1].strip()
+                parsed = _extract_json(display_text)
                 if parsed:
                     print("  │  " + json.dumps(parsed, indent=2)
                           .replace("\n", "\n  │  "))
                 else:
-                    # Print raw output stripped of llama-cli header noise
-                    clean = raw.split("model\n")[-1] if "model\n" in raw else raw
-                    print("  │  " + clean[:600].replace("\n", "\n  │  "))
+                    print("  │  " + display_text[:600].replace("\n", "\n  │  "))
             else:
                 print("  │  [no output captured]")
 

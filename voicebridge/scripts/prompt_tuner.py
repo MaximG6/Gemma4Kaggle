@@ -25,11 +25,18 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Optional
+
+_REPO_ROOT_PT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT_PT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT_PT))
+
+from pipeline.llama_infer import run_inference
 
 # ===========================================================================
 #  ██████╗ ██████╗ ███╗   ██╗███████╗██╗ ██████╗
@@ -52,103 +59,16 @@ LLAMA_CLI = str(Path.home() / "llama.cpp" / "build" / "bin" / "llama-cli")
 # Try different values to find what gives the most consistent JSON output.
 TEMP           = 0.1    # 0.0 = fully deterministic, 0.2 = slight variation
 REPEAT_PENALTY = 1.3    # penalise repeating tokens. try 1.1, 1.3, 1.5
-MAX_TOKENS     = 512    # max output length. try 300, 512, 600
+MAX_TOKENS     = 1024    # max output length. try 300, 512, 600
 GPU_LAYERS     = 99     # keep at 99 for RTX 5090
 THREADS        = 4
 
 # ── System prompt ─────────────────────────────────────────────────────────────
-# This is the main thing to experiment with.
-# Current version: detailed with few-shot examples and explicit red criteria.
-#
-# To test a different prompt:
-#   1. Comment out SYSTEM_PROMPT below
-#   2. Uncomment one of the ALTERNATIVE prompts further down
-#   3. Run and compare scores
+# Loaded from voicebridge/prompts/triage_system.txt — edit that file to change
+# the prompt. compare_models.py reads the same file.
 
-SYSTEM_PROMPT = """\
-You are a clinical triage assistant trained on SATS 2023 and WHO ETAT guidelines.
-The nurse's report language: {lang_name}.
-Extract structured triage data from the intake report.
-
-You MUST respond with ONLY a single JSON object. No markdown, no code fences, no explanation.
-The JSON MUST use EXACTLY these field names:
-  triage_level        — REQUIRED. Must be exactly one of: red, orange, yellow, green, blue
-  primary_complaint   — REQUIRED. One sentence describing the main clinical problem
-  red_flag_indicators — REQUIRED. Array of strings listing clinical red flags present
-  recommended_action  — REQUIRED. Specific clinical action to take immediately
-  confidence_score    — REQUIRED. Number between 0.0 and 1.0
-
-Triage level definitions:
-  red    = immediately life-threatening (cardiac arrest, active seizure >5min, uncontrolled haemorrhagic shock, AVPU=U, eclampsia)
-  orange = very urgent but STABLE — see within 10 minutes (suspected MI with normal BP, stroke alert, high fever with altered consciousness)
-  yellow = urgent — see within 1 hour (moderate pain, stable fever in child, minor head injury, vomiting blood if stable)
-  green  = standard queue — see within 4 hours (minor wounds, sore throat, mild fever, routine)
-  blue   = deceased or expectant (unsurvivable without major resources)
-
-CRITICAL RULE — Only assign "red" if the patient has at least ONE of:
-  - Absent or agonal breathing / no palpable pulse
-  - Active generalised seizure lasting >5 minutes or AVPU=U
-  - Uncontrolled haemorrhage WITH shock signs (HR>140 AND SBP<80)
-  - SpO2 <85% or RR <8 or RR >38 in an adult
-  - Active eclampsia (seizure in pregnancy)
-If none of these are present, use "orange" for serious presentations, not "red".
-
-Few-shot examples:
-
-Input: "Child 2 years. Convulsing for 10 minutes. Unresponsive. High fever."
-Output: {{"triage_level": "red", "primary_complaint": "Status epilepticus in a febrile toddler", "red_flag_indicators": ["active seizure >5 min", "AVPU=U"], "recommended_action": "Immediate airway protection, IV/IO benzodiazepine, measure glucose, prepare cooling.", "confidence_score": 0.98}}
-
-Input: "Adult male. Chest pain 45 min, radiates left arm. HR 108, BP 138/85, alert, sweating."
-Output: {{"triage_level": "orange", "primary_complaint": "Suspected acute coronary syndrome, haemodynamically stable", "red_flag_indicators": ["chest pain with radiation", "tachycardia", "diaphoresis"], "recommended_action": "ECG immediately, aspirin 300mg, IV access, cardiac monitoring, call cardiology.", "confidence_score": 0.93}}
-
-Input: "Child 4 years. Fever 38.9C for 2 days. Alert, eating. RR 28, HR 118."
-Output: {{"triage_level": "yellow", "primary_complaint": "Febrile child with mild tachycardia, haemodynamically stable", "red_flag_indicators": ["fever in child", "tachycardia"], "recommended_action": "Full assessment within 1 hour, antipyretic, oral fluids, monitor RR.", "confidence_score": 0.88}}
-
-Input: "Adult. Sore throat 2 days, low-grade fever 37.8C, eating normally, alert."
-Output: {{"triage_level": "green", "primary_complaint": "Mild upper respiratory tract infection", "red_flag_indicators": [], "recommended_action": "Standard queue. Symptomatic treatment. Return if worsens.", "confidence_score": 0.94}}
-
-Input: "Patient. No breathing, no pulse, fixed dilated pupils. Cold body, rigor mortis."
-Output: {{"triage_level": "blue", "primary_complaint": "Confirmed death — rigor mortis and absent vital signs", "red_flag_indicators": ["no respirations", "no pulse", "fixed dilated pupils", "rigor mortis"], "recommended_action": "Do not resuscitate. Notify next of kin. Handle respectfully.", "confidence_score": 0.99}}
-
-Now process the following intake report:\
-"""
-
-# ── ALTERNATIVE A — Minimal prompt, no examples ──────────────────────────────
-# SYSTEM_PROMPT = """\
-# You are a SATS 2023 clinical triage assistant. Language: {lang_name}.
-# Output ONLY a JSON object with fields:
-#   triage_level (must be: red/orange/yellow/green/blue)
-#   primary_complaint, red_flag_indicators, recommended_action, confidence_score
-# red=life-threatening now, orange=urgent stable 10min,
-# yellow=1hr, green=4hr, blue=deceased\
-# """
-
-# ── ALTERNATIVE B — Strict, no examples, explicit negative constraints ────────
-# SYSTEM_PROMPT = """\
-# Clinical triage assistant. SATS 2023. Language: {lang_name}.
-# Output: ONE JSON object only. No other text.
-# Required fields: triage_level, primary_complaint, red_flag_indicators, recommended_action, confidence_score
-# triage_level rules:
-#   blue  = confirmed death (rigor, fixed pupils, cold)
-#   red   = arrest OR active seizure >5min OR AVPU=U OR SpO2<85
-#   orange = serious but breathing and responding (chest pain, stroke, sepsis)
-#   yellow = moderate urgency, stable vitals
-#   green  = minor, can wait hours\
-# """
-
-# ── ALTERNATIVE C — Chain-of-thought then JSON ────────────────────────────────
-# SYSTEM_PROMPT = """\
-# You are a clinical triage assistant (SATS 2023). Language: {lang_name}.
-# First identify the 3 most critical clinical findings, then output JSON.
-# Format: {{
-#   "reasoning": "1. finding  2. finding  3. finding",
-#   "triage_level": "red|orange|yellow|green|blue",
-#   "primary_complaint": "...",
-#   "red_flag_indicators": [...],
-#   "recommended_action": "...",
-#   "confidence_score": 0.0-1.0
-# }}\
-# """
+_PROMPT_FILE = Path(__file__).parent.parent / "prompts" / "triage_system.txt"
+SYSTEM_PROMPT = _PROMPT_FILE.read_text(encoding="utf-8")
 
 # ===========================================================================
 #  10 TEST CASES — 2 per level, covering 5 languages
@@ -256,15 +176,6 @@ def _normalise(raw: str) -> Optional[str]:
     r = raw.lower().strip()
     if r in _LEVELS:
         return r
-    if any(x in r for x in ("immediate", "critical", "red")):    return "red"
-    if any(x in r for x in ("very urgent", "orange")):           return "orange"
-    if "urgent" in r and "very" not in r:                        return "yellow"
-    if "yellow" in r:                                            return "yellow"
-    if any(x in r for x in ("standard", "green")):               return "green"
-    if any(x in r for x in ("dead", "deceased", "expectant", "blue")): return "blue"
-    for i, lvl in enumerate(_LEVELS, 1):
-        if r.strip() == str(i):
-            return lvl
     return None
 
 
@@ -307,57 +218,29 @@ def _parse_full(raw: str) -> Optional[dict]:
         return None
 
 
-def _quote(s: str) -> str:
-    return "'" + str(s).replace("'", "'\\''") + "'"
-
-
-def run_case(case: dict, verbose: bool) -> tuple[Optional[str], float, str]:
-    lang    = _LANG_NAMES.get(case["lang"], "English")
-    system  = SYSTEM_PROMPT.format(lang_name=lang)
-    prompt  = (
-        f"<start_of_turn>system\n{system}<end_of_turn>\n"
-        f"<start_of_turn>user\n{case['text']}<end_of_turn>\n"
-        f"<start_of_turn>model\n{{"
+def run_case(case: dict, verbose: bool, dry_run: bool = False) -> tuple[Optional[str], float, str]:
+    predicted, latency, raw_full = run_inference(
+        FINE_GGUF, case["text"], case["lang"],
+        dry_run=dry_run,
+        system_prompt=SYSTEM_PROMPT,
+        temp=TEMP, repeat_penalty=REPEAT_PENALTY, max_tokens=MAX_TOKENS,
     )
-    tmp = Path(f"/tmp/vb_tune_{case['id']}_{os.getpid()}.txt")
-
-    cmd = " ".join(_quote(c) for c in [
-        LLAMA_CLI, "-m", FINE_GGUF, "-p", prompt,
-        "-n", str(MAX_TOKENS), "--threads", str(THREADS),
-        "--temp", str(TEMP), "--repeat-penalty", str(REPEAT_PENALTY),
-        "-ngl", str(GPU_LAYERS), "--single-turn", "--log-disable",
-    ]) + f" > {_quote(str(tmp))} 2>&1"
-
-    t0 = time.time()
-    try:
-        subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL,
-                       timeout=120, check=False)
-    except subprocess.TimeoutExpired:
-        tmp.unlink(missing_ok=True)
-        return None, 120.0, "[TIMEOUT]"
-
-    latency  = time.time() - t0
-    raw_full = tmp.read_text(errors="replace").strip() if tmp.exists() else ""
-    tmp.unlink(missing_ok=True)
-
-    raw_full = re.sub(r'\x1b\[[0-9;]*[mGKHFABCDJK]', '', raw_full)
-    raw_full = re.sub(r'\r', '', raw_full)
-    brace    = raw_full.find("{")
-    raw      = raw_full[brace:] if brace != -1 else "{}"
-
-    predicted = _parse(raw)
 
     if verbose:
         print(f"\n  ┌─ {case['id']}  expected={_col(case['level'])}  {'─'*38}")
-        parsed = _parse_full(raw)
+        model_start = raw_full.rfind("<start_of_turn>model")
+        display_text = raw_full[model_start:] if model_start != -1 else raw_full
+        if "[End thinking]" in display_text:
+            display_text = display_text.split("[End thinking]")[-1].strip()
+        parsed = _parse_full(display_text)
         if parsed:
             print("  │  " + json.dumps(parsed, indent=2).replace("\n", "\n  │  "))
         else:
-            print(f"  │  [raw]: {raw[:500]}")
+            print(f"  │  [raw]: {display_text[:500]}")
         mark = "✓" if predicted == case["level"] else "✗"
         print(f"  └─ extracted : {_col(predicted)} {mark}  ({latency:.1f}s)")
 
-    return predicted, latency, raw
+    return predicted, latency, raw_full
 
 
 def main() -> None:
@@ -366,15 +249,18 @@ def main() -> None:
     )
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Print full model response for every case")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Skip inference, return lang code as predicted level")
     args = parser.parse_args()
 
-    # Preflight checks
-    if not Path(LLAMA_CLI).exists():
-        print(f"[ERROR] llama-cli not found: {LLAMA_CLI}")
-        sys.exit(1)
-    if not Path(FINE_GGUF).exists():
-        print(f"[ERROR] GGUF not found: {FINE_GGUF}")
-        sys.exit(1)
+    # Preflight checks (skipped in dry-run)
+    if not args.dry_run:
+        if not Path(LLAMA_CLI).exists():
+            print(f"[ERROR] llama-cli not found: {LLAMA_CLI}")
+            sys.exit(1)
+        if not Path(FINE_GGUF).exists():
+            print(f"[ERROR] GGUF not found: {FINE_GGUF}")
+            sys.exit(1)
 
     print(f"\n{_BOLD}{'='*60}{_RESET}")
     print(f"{_BOLD}  VoiceBridge Prompt Tuner{_RESET}")
@@ -396,7 +282,7 @@ def main() -> None:
             print(f"  {case['id']} (expected {_col(case['level'])}) ...",
                   end=" ", flush=True)
 
-        predicted, latency, _ = run_case(case, args.verbose)
+        predicted, latency, _ = run_case(case, args.verbose, args.dry_run)
 
         is_correct = (predicted == case["level"])
         is_safe    = (
@@ -439,7 +325,7 @@ def main() -> None:
     print(f"  {_BOLD}Exact match     : "
           f"{acc_colour}{correct}/{len(TEST_CASES)} ({pct:.0%}){_RESET}")
     print(f"  {_BOLD}Safe escalation : "
-          f"{correct}/{len(TEST_CASES)} ({safe_pct:.0%}){_RESET}")
+        f"{safe}/{len(TEST_CASES)} ({safe_pct:.0%}){_RESET}")
     print(f"  Total time      : {elapsed:.0f}s")
     print(f"{'='*60}")
 
