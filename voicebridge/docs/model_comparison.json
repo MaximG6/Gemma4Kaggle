@@ -15,15 +15,15 @@
     "max_tokens": 1024
   },
   "tuned": {
-    "exact_match_accuracy": 0.9,
+    "exact_match_accuracy": 0.95,
     "safe_escalation_rate": 1.0,
     "unsafe_count": 0,
     "validator_agreement": 0.85,
     "per_level": {
       "blue": {
         "n": 4,
-        "correct": 3,
-        "accuracy": 0.75
+        "correct": 4,
+        "accuracy": 1.0
       },
       "green": {
         "n": 4,
@@ -54,8 +54,8 @@
       },
       "tl": {
         "n": 4,
-        "correct": 3,
-        "accuracy": 0.75
+        "correct": 4,
+        "accuracy": 1.0
       },
       "ha": {
         "n": 4,
@@ -316,12 +316,12 @@
         "id": "B02",
         "lang": "tl",
         "expected": "blue",
-        "predicted": "red",
-        "correct": false,
+        "predicted": "blue",
+        "correct": true,
         "safe": true,
         "validator_safe": true,
-        "conflict": false,
-        "conflict_dir": "none",
+        "conflict": true,
+        "conflict_dir": "rule_under_triaged",
         "rule_colour": "red",
         "tews_score": null,
         "note": "Expectant \u2014 BLUE per local protocol"
@@ -357,15 +357,15 @@
     ]
   },
   "tuned_latency": {
-    "mean_s": 6.24,
-    "median_s": 6.4,
-    "p50_s": 6.43,
-    "p95_s": 7.73,
-    "min_s": 4.62,
-    "max_s": 7.73
+    "mean_s": 6.2,
+    "median_s": 6.47,
+    "p50_s": 6.48,
+    "p95_s": 7.4,
+    "min_s": 3.77,
+    "max_s": 7.4
   },
   "base": {
-    "exact_match_accuracy": 0.7,
+    "exact_match_accuracy": 0.65,
     "safe_escalation_rate": 0.9,
     "unsafe_count": 2,
     "validator_agreement": 0.75,
@@ -377,18 +377,18 @@
       },
       "green": {
         "n": 4,
-        "correct": 4,
-        "accuracy": 1.0
+        "correct": 3,
+        "accuracy": 0.75
       },
       "yellow": {
         "n": 4,
-        "correct": 2,
-        "accuracy": 0.5
+        "correct": 1,
+        "accuracy": 0.25
       },
       "orange": {
         "n": 4,
-        "correct": 3,
-        "accuracy": 0.75
+        "correct": 4,
+        "accuracy": 1.0
       },
       "red": {
         "n": 4,
@@ -399,8 +399,8 @@
     "per_language": {
       "sw": {
         "n": 5,
-        "correct": 4,
-        "accuracy": 0.8
+        "correct": 3,
+        "accuracy": 0.6
       },
       "tl": {
         "n": 4,
@@ -512,9 +512,9 @@
         "id": "O03",
         "lang": "en",
         "expected": "orange",
-        "predicted": "green",
-        "correct": false,
-        "safe": false,
+        "predicted": "orange",
+        "correct": true,
+        "safe": true,
         "validator_safe": false,
         "conflict": true,
         "conflict_dir": "llm_under_triaged",
@@ -582,12 +582,12 @@
         "id": "Y04",
         "lang": "sw",
         "expected": "yellow",
-        "predicted": "yellow",
-        "correct": true,
-        "safe": true,
-        "validator_safe": true,
-        "conflict": false,
-        "conflict_dir": "none",
+        "predicted": "green",
+        "correct": false,
+        "safe": false,
+        "validator_safe": false,
+        "conflict": true,
+        "conflict_dir": "llm_under_triaged",
         "rule_colour": "yellow",
         "tews_score": 0,
         "note": "Head injury \u2014 urgent discriminator"
@@ -610,12 +610,12 @@
         "id": "G02",
         "lang": "en",
         "expected": "green",
-        "predicted": "green",
-        "correct": true,
+        "predicted": "yellow",
+        "correct": false,
         "safe": true,
         "validator_safe": true,
-        "conflict": false,
-        "conflict_dir": "none",
+        "conflict": true,
+        "conflict_dir": "rule_under_triaged",
         "rule_colour": "green",
         "tews_score": 0,
         "note": "URI \u2014 normal vitals, no discriminators"
@@ -680,12 +680,12 @@
         "id": "B03",
         "lang": "sw",
         "expected": "blue",
-        "predicted": "green",
+        "predicted": "red",
         "correct": false,
         "safe": true,
-        "validator_safe": false,
-        "conflict": true,
-        "conflict_dir": "llm_under_triaged",
+        "validator_safe": true,
+        "conflict": false,
+        "conflict_dir": "none",
         "rule_colour": "red",
         "tews_score": 8,
         "note": "Expectant \u2014 burns > 90% TBSA in resource-limited setting"
@@ -707,15 +707,15 @@
     ]
   },
   "base_latency": {
-    "mean_s": 7.52,
-    "median_s": 7.43,
-    "p50_s": 7.53,
-    "p95_s": 13.5,
-    "min_s": 5.13,
-    "max_s": 13.5
+    "mean_s": 7.41,
+    "median_s": 7.49,
+    "p50_s": 7.54,
+    "p95_s": 8.45,
+    "min_s": 6.07,
+    "max_s": 8.45
   },
   "delta": {
-    "exact_match_accuracy": 0.2,
+    "exact_match_accuracy": 0.3,
     "safe_escalation_rate": 0.1,
     "unsafe_count": -2,
     "validator_agreement": 0.1

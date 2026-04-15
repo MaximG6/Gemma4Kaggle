@@ -57,3 +57,70 @@ G1 (expected GREEN) ... → GREEN ✓  (6.0s)
 G2 (expected GREEN) ... → GREEN ✓  (6.7s)
 B1 (expected BLUE) ... → BLUE ✓  (4.9s)
 B2 (expected BLUE) ... → BLUE ✓  (5.2s)
+
+PROMPT 2 was the best so I will try multiple variations of it (prompts I am testing here are in the "prompts_to_test.txt" file)
+PROMPT 2.1:
+============================================================
+  SCORE BREAKDOWN
+============================================================
+  RED           ██  2/2
+  ORANGE        ██  2/2
+  YELLOW        ██  2/2
+  GREEN         █░  1/2  ← predicted yellow
+  BLUE          ██  2/2
+────────────────────────────────────────────────────────────
+  Exact match     : 9/10 (90%)
+  Safe escalation : 10/10 (100%)
+  Total time      : 63s
+============================================================
+
+PROMPT 2.2:
+============================================================
+  SCORE BREAKDOWN
+============================================================
+  RED           ██  2/2
+  ORANGE        █░  1/2  ← predicted yellow
+  YELLOW        █░  1/2  ← predicted green
+  GREEN         ██  2/2
+  BLUE          ██  2/2
+────────────────────────────────────────────────────────────
+  Exact match     : 8/10 (80%)
+  Safe escalation : 8/10 (80%)
+  Total time      : 64s
+============================================================
+
+PROMPT 2.3:
+============================================================
+  SCORE BREAKDOWN
+============================================================
+  RED           ██  2/2
+  ORANGE        █░  1/2  ← predicted None
+  YELLOW        █░  1/2  ← predicted green
+  GREEN         ██  2/2
+  BLUE          ██  2/2
+────────────────────────────────────────────────────────────
+  Exact match     : 8/10 (80%)
+  Safe escalation : 8/10 (80%)
+  Total time      : 62s
+============================================================
+
+PROMPT 2.4:
+============================================================
+  SCORE BREAKDOWN
+============================================================
+  RED           ██  2/2
+  ORANGE        ██  2/2
+  YELLOW        █░  1/2  ← predicted green
+  GREEN         █░  1/2  ← predicted yellow
+  BLUE          ██  2/2
+────────────────────────────────────────────────────────────
+  Exact match     : 8/10 (80%)
+  Safe escalation : 9/10 (90%)
+  Total time      : 65s
+============================================================
+
+
+Takeaways from prompt engineering:
+Gemma 4 is very good with specific instructions and is easy to get structured well thought-out answers from
+Simpler prompts are usually better than long drawn out ones
+The best prompt structure for this task in my tests was a Ordered Rule-Based prompt where i would go through a decision tree of triage levels
