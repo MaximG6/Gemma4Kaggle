@@ -69,4 +69,4 @@ Benchmark: 20 cases (4 per SATS level), 5 languages (sw, tl, ha, bn, en). Infere
 
 ## Clinical Interpretation
 
-Fine-tuning Gemma 4 E4B on the VoiceBridge triage dataset produces a clinically meaningful improvement. Safe escalation rate: 90.0% to 100.0% (+10 pp), with 2 fewer unsafe under-triage cases. RED accuracy: 100.0% to 100.0%. Overall accuracy: +30.0 pp (65.0% to 95.0%). SATS validator agreement: +10.0 pp. All results from real llama-cli GGUF inference with RTX 5090 GPU offload.
+Fine-tuning Gemma 4 E4B on the VoiceBridge triage dataset produces a clinically meaningful improvement. Safe escalation rate: 90.0% to 100.0% (+10 pp), with 2 fewer unsafe under-triage cases. Overall accuracy: +30.0 pp (65.0% to 95.0%). SATS validator agreement: +10.0 pp. All results from real llama-cli GGUF inference with RTX 5090 GPU.
