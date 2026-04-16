@@ -34,10 +34,6 @@ import time
 from pathlib import Path
 from typing import Optional
 
-# ---------------------------------------------------------------------------
-# Path setup
-# ---------------------------------------------------------------------------
-
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT))
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
@@ -49,10 +45,6 @@ from pipeline.llama_infer import (
     run_inference, SYSTEM_PROMPT, LANG_NAMES, GPU_LAYERS, THREADS,
     TEMP, REPEAT_PENALTY, MAX_TOKENS, FINE_GGUF, LLAMA_CLI,
 )
-
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
 
 _HOME      = Path.home()
 _LLAMA_CLI = str(_HOME / "llama.cpp" / "build" / "bin" / "llama-cli")
@@ -75,10 +67,6 @@ def _find_base_gguf() -> str:
 BASE_GGUF = os.environ.get("BASE_GGUF", _find_base_gguf())
 FINE_GGUF = os.environ.get("FINE_GGUF", str(_HOME / "voicebridge-finetuned-q4km.gguf"))
 
-# ---------------------------------------------------------------------------
-# Checkpoint helpers
-# ---------------------------------------------------------------------------
-
 _GLOBAL_CKPT: dict = {}
 
 
@@ -97,10 +85,6 @@ def _save_checkpoint() -> None:
     tmp.write_text(json.dumps(_GLOBAL_CKPT, indent=2))
     tmp.replace(_CKPT_PATH)
 
-# ---------------------------------------------------------------------------
-# Output parser
-# ---------------------------------------------------------------------------
-
 def _normalise_level(raw: str) -> Optional[str]:
     if not raw:
         return None
@@ -115,16 +99,13 @@ def _parse_triage_level(raw: str) -> Optional[str]:
     if "[End thinking]" in raw:
         raw = raw.split("[End thinking]")[-1].strip()
 
-    # Strip markdown code fences
     raw = re.sub(r"```json\s*", "", raw)
     raw = re.sub(r"```\s*",     "", raw)
 
-    # Try full JSON parse
     start = raw.find("{")
     if start != -1:
         end      = raw.rfind("}") + 1
         json_str = raw[start:end] if end > start else raw[start:] + "}"
-        # Fix trailing commas before closing brace (common model error)
         json_str = re.sub(r",\s*}", "}", json_str)
         json_str = re.sub(r",\s*]", "]", json_str)
         try:
@@ -146,7 +127,6 @@ def _parse_triage_level(raw: str) -> Optional[str]:
 
 
 def _extract_json(raw: str) -> Optional[dict]:
-    """Try to extract and return the full parsed JSON dict, or None."""
     if "[End thinking]" in raw:
         raw = raw.split("[End thinking]")[-1].strip()
     raw = re.sub(r"```json\s*", "", raw)
@@ -163,20 +143,15 @@ def _extract_json(raw: str) -> Optional[dict]:
     except json.JSONDecodeError:
         return None
 
-# ---------------------------------------------------------------------------
-# LlamaClassifier
-# ---------------------------------------------------------------------------
-
 _LEVEL_COLOURS = {
     "red":    "\033[91m",   # bright red
-    "orange": "\033[93m",   # yellow (closest to orange in ANSI)
-    "yellow": "\033[33m",   # dark yellow
+    "orange": "\033[33m",   # yellow (closest to orange in ANSI)
+    "yellow": "\033[93m",   # dark yellow
     "green":  "\033[92m",   # bright green
     "blue":   "\033[94m",   # bright blue
     None:     "\033[90m",   # grey for unknown
 }
 _RESET = "\033[0m"
-
 
 class LlamaClassifier:
     def __init__(
@@ -212,14 +187,12 @@ class LlamaClassifier:
             if self.dry_run:
                 predicted = case["level"]
 
-            # ── Print full response ──────────────────────────────────────────
             print(f"\n  ┌─ [{self.label}] {case_id} "
                   f"(expected: {_LEVEL_COLOURS.get(case['level'], '')}"
                   f"{case['level'].upper()}{_RESET}) "
                   f"{'─' * (40 - len(case_id))}")
 
             if raw and raw != "{}":
-                # Scope to the model's reply (skip typescript header + prompt echo)
                 model_start = raw.rfind("<start_of_turn>model")
                 display_text = raw[model_start:] if model_start != -1 else raw
                 if "[End thinking]" in display_text:
@@ -233,7 +206,6 @@ class LlamaClassifier:
             else:
                 print("  │  [no output captured]")
 
-            # ── Print extracted triage level ─────────────────────────────────
             if predicted is None:
                 print(f"  └─ Extracted level : ⚠ PARSE FAILED — defaulting green")
                 predicted = "green"
@@ -244,11 +216,10 @@ class LlamaClassifier:
                       f"{colour}{predicted.upper()}{_RESET} {mark}  "
                       f"({latency:.1f}s)")
 
-            # Save to checkpoint
             self._cache[case_id] = {
                 "predicted": predicted,
                 "latency":   latency,
-                "raw":       raw[:500],   # save first 500 chars for debugging
+                "raw":       raw[:500],
             }
             _GLOBAL_CKPT[self.label] = self._cache
             _save_checkpoint()
@@ -285,10 +256,6 @@ class LlamaClassifier:
             "max_s":    round(lats[-1], 2),
         }
 
-# ---------------------------------------------------------------------------
-# Formatting helpers
-# ---------------------------------------------------------------------------
-
 def _pct(v: float) -> str: return f"{v:.1%}"
 
 def _delta(a: float, b: float) -> str:
@@ -298,10 +265,6 @@ def _delta(a: float, b: float) -> str:
 def _int_delta(a: int, b: int) -> str:
     d = b - a
     return f"{'+' if d > 0 else ''}{d}"
-
-# ---------------------------------------------------------------------------
-# Markdown report
-# ---------------------------------------------------------------------------
 
 def build_markdown(
     base: AccuracyResult,
@@ -475,10 +438,6 @@ def build_markdown(
     lines.append("")
     return "\n".join(lines)
 
-# ---------------------------------------------------------------------------
-# JSON output
-# ---------------------------------------------------------------------------
-
 def build_json(
     base: AccuracyResult,
     tuned: AccuracyResult,
@@ -529,10 +488,6 @@ def build_json(
         }
     return out
 
-# ---------------------------------------------------------------------------
-# VRAM check
-# ---------------------------------------------------------------------------
-
 def _check_vram() -> None:
     try:
         r = subprocess.run(
@@ -550,10 +505,6 @@ def _check_vram() -> None:
                     print("  ⚠  Low VRAM — close your local LLM before running")
     except Exception:
         pass
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 def main() -> None:
     global _GLOBAL_CKPT
@@ -601,7 +552,6 @@ def main() -> None:
             sys.exit(1)
         _check_vram()
 
-    # ── Fine-tuned model (runs first) ─────────────────────────────────────────
     remaining = len(TEST_CASES) - len(tuned_cache)
     print(f"\nFine-tuned model: {remaining} cases remaining …\n")
     tuned_clf = LlamaClassifier(
@@ -618,7 +568,6 @@ def main() -> None:
           f"safe={tuned_acc.safe_rate:.1%}  "
           f"unsafe={tuned_acc.unsafe_count}")
 
-    # ── Base model (runs second) ───────────────────────────────────────────────
     base_acc = None
     base_lat: dict = {}
 
@@ -639,7 +588,6 @@ def main() -> None:
               f"safe={base_acc.safe_rate:.1%}  "
               f"unsafe={base_acc.unsafe_count}")
 
-    # Placeholder base if tuned-only
     if base_acc is None:
         base_acc = AccuracyResult(
             n=len(TEST_CASES), accuracy=0.0, safe_rate=0.0,
@@ -647,7 +595,6 @@ def main() -> None:
             validator_agree=0.0, case_results=[],
         )
 
-    # ── Save outputs ───────────────────────────────────────────────────────────
     docs_dir = _REPO_ROOT / "docs"
     docs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -675,7 +622,6 @@ def main() -> None:
     print(f"\n  Markdown → {md_path.relative_to(_REPO_ROOT)}")
     print(f"  JSON     → {json_path.relative_to(_REPO_ROOT)}")
 
-    # ── Final summary ──────────────────────────────────────────────────────────
     print("\n" + "=" * 64)
     print("  FINAL SUMMARY")
     print("=" * 64)

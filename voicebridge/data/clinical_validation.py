@@ -24,13 +24,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 
-# ---------------------------------------------------------------------------
-# Constants — SATS colour ordering for comparison
-# ---------------------------------------------------------------------------
-
 COLOUR_ORDER = {"green": 0, "yellow": 1, "orange": 2, "red": 3, "blue": 4}
 
-# Triage level → time-to-treatment target (minutes)
 TIME_TO_TREATMENT: dict[str, str] = {
     "red":    "Immediate (0 min) — call physician now",
     "orange": "Within 10 minutes — senior nurse assessment",
@@ -39,10 +34,6 @@ TIME_TO_TREATMENT: dict[str, str] = {
     "blue":   "Deceased — manage per local protocol",
 }
 
-
-# ---------------------------------------------------------------------------
-# Multilingual red flag keywords → immediate RED trigger
-# ---------------------------------------------------------------------------
 
 RED_FLAG_KEYWORDS: dict[str, list[str]] = {
     "en": [
@@ -84,7 +75,6 @@ RED_FLAG_KEYWORDS: dict[str, list[str]] = {
     ],
 }
 
-# Emergency discriminators (plain English — matched against transcript_english)
 EMERGENCY_DISCRIMINATORS: list[str] = [
     "airway obstruction", "airway blocked", "apnoea", "apnea",
     "not breathing", "stopped breathing", "absent breathing",
@@ -123,10 +113,6 @@ URGENT_DISCRIMINATORS: list[str] = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# TEWS calculation helpers
-# ---------------------------------------------------------------------------
-
 def _score_rr(rr: float) -> int:
     """Respiratory rate score. Source: SATS TEWS adult table."""
     if rr <= 8:
@@ -134,10 +120,10 @@ def _score_rr(rr: float) -> int:
     if rr <= 14:
         return 2
     if rr <= 24:
-        return 0   # normal range
+        return 0
     if rr <= 29:
         return 1
-    return 2       # >= 30
+    return 2
 
 
 def _score_hr(hr: float) -> int:
@@ -147,12 +133,12 @@ def _score_hr(hr: float) -> int:
     if hr <= 50:
         return 2
     if hr <= 99:
-        return 0   # normal range
+        return 0
     if hr <= 110:
         return 1
     if hr <= 129:
         return 2
-    return 3       # >= 130
+    return 3
 
 
 def _score_sbp(sbp: float) -> int:
@@ -163,7 +149,7 @@ def _score_sbp(sbp: float) -> int:
         return 2
     if sbp <= 100:
         return 1
-    return 0       # >= 101, normal (high BP does not score in TEWS)
+    return 0
 
 
 def _score_temp(temp: float) -> int:
@@ -182,7 +168,7 @@ def _score_avpu(avpu: str) -> int:
         return 2
     if avpu == "V":
         return 1
-    return 0   # A (Alert) or unknown defaults to 0
+    return 0
 
 
 def _score_mobility(mobility: str) -> int:
@@ -214,10 +200,6 @@ def _tews_to_colour(tews: int) -> str:
     return "red"
 
 
-# ---------------------------------------------------------------------------
-# SpO2 and glucose upgrade rules (Part 3 of SATS)
-# ---------------------------------------------------------------------------
-
 def _apply_additional_investigations(
     colour: str,
     spo2: Optional[float],
@@ -239,23 +221,18 @@ def _apply_additional_investigations(
     if glucose is not None:
         avpu_rank = _score_avpu(avpu)
         if glucose < 3.0:
-            if avpu_rank >= 1:   # V, P, or U — altered consciousness
+            if avpu_rank >= 1:
                 current_rank = max(current_rank, COLOUR_ORDER["red"])
             else:
                 current_rank = max(current_rank, COLOUR_ORDER["orange"])
         elif glucose > 20.0:
             current_rank = max(current_rank, COLOUR_ORDER["orange"])
 
-    # Reverse lookup
     for colour_name, rank in COLOUR_ORDER.items():
         if rank == current_rank:
             return colour_name
     return colour
 
-
-# ---------------------------------------------------------------------------
-# Discriminator detection
-# ---------------------------------------------------------------------------
 
 def _detect_discriminators(
     text: str,
@@ -273,20 +250,17 @@ def _detect_discriminators(
     matched: list[str] = []
     highest_colour: str | None = None
 
-    # Check multilingual keywords (all languages in transcript)
     for lang, keywords in RED_FLAG_KEYWORDS.items():
         for kw in keywords:
             if kw.lower() in text_lower:
                 matched.append(f"[{lang}] {kw}")
                 highest_colour = "red"
 
-    # Check English emergency discriminators
     for disc in EMERGENCY_DISCRIMINATORS:
         if disc in text_lower:
             matched.append(disc)
             highest_colour = "red"
 
-    # Check very urgent discriminators only if no RED found
     if highest_colour != "red":
         for disc in VERY_URGENT_DISCRIMINATORS:
             if disc in text_lower:
@@ -294,7 +268,6 @@ def _detect_discriminators(
                 if highest_colour != "orange":
                     highest_colour = "orange"
 
-    # Check urgent discriminators only if no RED or ORANGE found
     if highest_colour not in ("red", "orange"):
         for disc in URGENT_DISCRIMINATORS:
             if disc in text_lower:
@@ -303,10 +276,6 @@ def _detect_discriminators(
 
     return highest_colour, matched
 
-
-# ---------------------------------------------------------------------------
-# Main rule-based SATS function
-# ---------------------------------------------------------------------------
 
 def _rule_based_sats(
     vital_signs: dict,
@@ -335,16 +304,12 @@ def _rule_based_sats(
     Returns:
         (colour, tews_score_or_none, matched_discriminators)
     """
-    # --- Step 1: Check discriminators (Part 1 of SATS) ---
-    # Combine red_flags list and transcript for matching
     combined_text = " ".join(red_flags) + " " + transcript_english
     disc_colour, matched_discs = _detect_discriminators(combined_text, language)
 
-    # If emergency discriminator found → RED immediately (no TEWS needed)
     if disc_colour == "red":
         return "red", None, matched_discs
 
-    # --- Step 2: Calculate TEWS (Part 2 of SATS) ---
     tews = 0
     vitals_available = False
 
@@ -373,18 +338,15 @@ def _rule_based_sats(
     tews += _score_mobility(str(mobility))
     tews += _score_trauma(bool(trauma))
 
-    # If no numeric vitals reported, TEWS is unreliable
     tews_colour = _tews_to_colour(tews) if vitals_available else "green"
     tews_score = tews if vitals_available else None
 
-    # --- Step 3: Apply additional investigations (Part 3 of SATS) ---
     spo2 = vital_signs.get("spo2")
     glucose = vital_signs.get("glucose")
     final_colour = _apply_additional_investigations(
         tews_colour, spo2, glucose, str(avpu)
     )
 
-    # --- Step 4: Apply any non-RED discriminators ---
     if disc_colour is not None:
         disc_rank = COLOUR_ORDER.get(disc_colour, 0)
         final_rank = COLOUR_ORDER.get(final_colour, 0)
@@ -394,10 +356,6 @@ def _rule_based_sats(
     return final_colour, tews_score, matched_discs
 
 
-# ---------------------------------------------------------------------------
-# Validation result dataclass
-# ---------------------------------------------------------------------------
-
 @dataclass
 class ValidationResult:
     llm_colour: str
@@ -405,15 +363,11 @@ class ValidationResult:
     tews_score: Optional[int]
     matched_discriminators: list[str]
     conflict: bool
-    conflict_direction: str   # "none", "llm_under_triaged", "rule_under_triaged"
-    safe_colour: str          # always the more urgent of the two
+    conflict_direction: str
+    safe_colour: str
     warning_message: str
     time_to_treatment: str
 
-
-# ---------------------------------------------------------------------------
-# Public validate_triage function
-# ---------------------------------------------------------------------------
 
 def validate_triage(
     llm_colour: str,
@@ -484,10 +438,6 @@ def validate_triage(
     )
 
 
-# ---------------------------------------------------------------------------
-# Convenience: score individual TEWS components for display
-# ---------------------------------------------------------------------------
-
 def explain_tews(vital_signs: dict) -> dict:
     """
     Return per-parameter TEWS scores for display in the PDF form.
@@ -523,12 +473,7 @@ def explain_tews(vital_signs: dict) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Quick smoke test
-# ---------------------------------------------------------------------------
-
 if __name__ == "__main__":
-    # RED case: RR=32, HR=140, AVPU=P → TEWS ≥ 7
     result = validate_triage(
         llm_colour="orange",
         vital_signs={"rr": 32, "hr": 140, "avpu": "P", "sbp": 85},
@@ -543,7 +488,6 @@ if __name__ == "__main__":
     print(f"Warning: {result.warning_message}")
     print()
 
-    # GREEN case: all normal
     result2 = validate_triage(
         llm_colour="green",
         vital_signs={"rr": 18, "hr": 78, "sbp": 118, "temp": 37.1, "avpu": "A"},
@@ -557,7 +501,6 @@ if __name__ == "__main__":
     print(f"Conflict: {result2.conflict}")
     print()
 
-    # SpO2 upgrade test: TEWS=2 (green) but SpO2=88 → should upgrade to RED
     result3 = validate_triage(
         llm_colour="yellow",
         vital_signs={"rr": 20, "hr": 95, "sbp": 110, "temp": 37.8,
@@ -571,7 +514,6 @@ if __name__ == "__main__":
           f"Safe: {result3.safe_colour} | TEWS: {result3.tews_score}")
     print(f"Warning: {result3.warning_message}")
 
-    # Swahili keyword test
     result4 = validate_triage(
         llm_colour="green",
         vital_signs={},

@@ -13,7 +13,7 @@ Loss log        : runs/finetune_log.jsonl
 
 Usage (from voicebridge/ repo root, conda env voicebridge active):
     python scripts/finetune.py
-    python scripts/finetune.py --epochs 2 --dry-run   # smoke-test 10 steps
+    python scripts/finetune.py --epochs 2 --dry-run
 """
 
 from __future__ import annotations
@@ -25,16 +25,8 @@ import sys
 import time
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Repo-root path setup
-# ---------------------------------------------------------------------------
-
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT))
-
-# ---------------------------------------------------------------------------
-# Hyper-parameters (all overridable via CLI flags)
-# ---------------------------------------------------------------------------
 
 DEFAULTS = dict(
     model_id          = "google/gemma-4-e4b-it",
@@ -53,7 +45,7 @@ DEFAULTS = dict(
     # Training
     epochs            = 2,
     per_device_batch  = 2,
-    grad_accumulation = 4,      # effective batch size = 2 × 4 = 8
+    grad_accumulation = 4,
     learning_rate     = 2e-4,
     lr_scheduler      = "cosine",
     warmup_ratio      = 0.05,
@@ -62,11 +54,6 @@ DEFAULTS = dict(
     # Quantisation
     load_in_4bit      = True,
 )
-
-
-# ---------------------------------------------------------------------------
-# Dataset helpers
-# ---------------------------------------------------------------------------
 
 def load_jsonl(path: str) -> list[dict]:
     records = []
@@ -79,18 +66,6 @@ def load_jsonl(path: str) -> list[dict]:
 
 
 def format_prompt(record: dict) -> str:
-    """
-    Convert a finetune_train.jsonl record into a single string that the
-    Gemma chat template expects.
-
-    Each record has:
-        instruction : str   — system prompt
-        input       : str   — nurse intake transcript
-        output      : str   — target TriageOutput JSON
-
-    We format as a 3-turn conversation (system / user / assistant) using
-    Gemma's standard control tokens.
-    """
     instruction = record.get("instruction", "")
     user_input  = record.get("input", "")
     output      = record.get("output", "")
@@ -108,23 +83,12 @@ def format_prompt(record: dict) -> str:
         "<end_of_turn>"
     )
 
-
-# ---------------------------------------------------------------------------
-# Loss logger callback
-# ---------------------------------------------------------------------------
-
 class JsonlLossLogger:
-    """
-    Lightweight training callback that appends a JSON line to
-    runs/finetune_log.jsonl every `log_steps` steps.
-    Compatible with both Hugging Face TrainerCallback and direct calls.
-    """
-
     def __init__(self, log_path: str, log_steps: int) -> None:
         self.log_path  = Path(log_path)
         self.log_steps = log_steps
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        # Truncate / create fresh log for this run
+        
         self.log_path.write_text("")
         self.best_loss = float("inf")
         self.best_step = 0
@@ -150,20 +114,9 @@ class JsonlLossLogger:
         with self.log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
 
-
-# ---------------------------------------------------------------------------
-# Main fine-tune routine
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# Per-print elapsed-time helper (module-level so all entry points can use it)
-# ---------------------------------------------------------------------------
-
 _t_ref = [time.time()]
 
 def _tick(msg: str, file=None) -> None:
-    """Print msg prefixed with [+Xs] elapsed since the last _tick call."""
     now    = time.time()
     delta  = now - _t_ref[0]
     _t_ref[0] = now
@@ -173,7 +126,6 @@ def _tick(msg: str, file=None) -> None:
 
 
 def run_finetune(cfg: dict) -> None:
-    # ── Imports (deferred so CLI --help works without GPU) ──────────────────
     _tick("[1/7] Importing torch + CUDA (may take 20–60s on first run) …")
     import torch
     _tick(f"      torch {torch.__version__}  "
@@ -210,7 +162,6 @@ def run_finetune(cfg: dict) -> None:
         )
         sys.exit(1)
 
-    # ── Validate dataset ─────────────────────────────────────────────────────
     dataset_path = cfg["dataset_path"]
     if not Path(dataset_path).exists():
         print(f"[ERROR] Dataset not found: {dataset_path}", file=sys.stderr)
@@ -224,8 +175,6 @@ def run_finetune(cfg: dict) -> None:
     else:
         _tick(f"  {len(raw_records)} records loaded")
 
-    # Store messages for later — dataset is built after tokenizer loads
-    # so we can apply the chat template with the real tokenizer.
     formatted = [
         {
             "messages": [
@@ -237,7 +186,6 @@ def run_finetune(cfg: dict) -> None:
         for r in raw_records
     ]
 
-    # ── Load base model via Unsloth ──────────────────────────────────────────
     _tick(f"\n[6/7] Loading {cfg['model_id']} via Unsloth …\n"
           f"      4-bit quant: {cfg['load_in_4bit']}  "
           f"max_seq_length: {cfg['max_seq_length']}  dtype: bfloat16\n"
@@ -248,16 +196,12 @@ def run_finetune(cfg: dict) -> None:
         max_seq_length = cfg["max_seq_length"],
         load_in_4bit   = cfg["load_in_4bit"],
         dtype          = torch.bfloat16,
-        # sm_120 (RTX 5090 / Blackwell) — Unsloth auto-detects, but we
-        # explicitly allow the architecture so it doesn't fall back to eager.
         device_map     = "auto",
     )
     _vram_gb = (torch.cuda.memory_allocated() / 1024**3
                 if torch.cuda.is_available() else 0.0)
     _tick(f"      Model loaded.  VRAM used: {_vram_gb:.1f} GB")
-
-    # Apply chat template now that tokenizer is available, producing a plain
-    # "text" dataset — avoids the collator receiving raw "messages" dicts.
+    
     _tick(f"      Applying chat template to {len(formatted)} examples …")
     dataset = Dataset.from_dict({
         "text": [
@@ -268,16 +212,11 @@ def run_finetune(cfg: dict) -> None:
         ]
     })
     _tick(f"      Dataset ready  ({len(dataset)} examples)")
-
-    # Pre-tokenise so SFTTrainer receives input_ids/labels/attention_mask directly.
-    # This bypasses SFTTrainer's internal lazy tokenisation, which in trl 0.10+
-    # runs _remove_unused_columns on the raw dataset before tokenising — causing
-    # the "text" column to be dropped before it is ever processed.
     _tick(f"      Pre-tokenising {len(dataset)} examples …")
 
     def _tokenize_batch(batch):
         enc = tokenizer(
-            text=batch["text"],          # keyword arg — Gemma4 processor has images first
+            text=batch["text"],
             truncation=True,
             max_length=cfg["max_seq_length"],
             padding=False,
@@ -289,8 +228,6 @@ def run_finetune(cfg: dict) -> None:
     _tick(f"      Pre-tokenised  ({len(dataset)} examples, "
           f"columns: {dataset.column_names})")
 
-    # ── Train / eval split (90 / 10) ─────────────────────────────────────────
-    # Skip split in dry-run (too few examples to split meaningfully)
     if not cfg.get("dry_run") and len(dataset) >= 20:
         split       = dataset.train_test_split(test_size=0.1, seed=42)
         train_data  = split["train"]
@@ -301,7 +238,6 @@ def run_finetune(cfg: dict) -> None:
         eval_data  = None
         _tick(f"      No eval split (dry-run or too few examples).")
 
-    # ── Attach LoRA adapter ──────────────────────────────────────────────────
     _tick(f"      Attaching LoRA adapter "
           f"(r={cfg['lora_rank']}, α={cfg['lora_alpha']}, "
           f"modules={len(cfg['target_modules'])}) …")
@@ -321,12 +257,10 @@ def run_finetune(cfg: dict) -> None:
     _tick(f"      Trainable params: {trainable_params:,}  "
           f"({100 * trainable_params / total_params:.2f}% of {total_params:,})")
 
-    # ── Prepare output directories ────────────────────────────────────────────
     runs_dir = Path(cfg["log_path"]).parent
     for p in [cfg["adapter_output"], cfg["merged_output"], str(runs_dir)]:
         Path(p).mkdir(parents=True, exist_ok=True)
 
-    # ── Write run config snapshot ─────────────────────────────────────────────
     run_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     finetune_config = {
         "model_id":              cfg["model_id"],
@@ -355,7 +289,6 @@ def run_finetune(cfg: dict) -> None:
     config_json_path.write_text(json.dumps(finetune_config, indent=2))
     _tick(f"  Run config saved → {config_json_path}")
 
-    # ── Training arguments ────────────────────────────────────────────────────
     max_steps = -1
     if cfg.get("dry_run"):
         max_steps = 10
@@ -388,14 +321,12 @@ def run_finetune(cfg: dict) -> None:
         packing                     = False,
     )
 
-    # ── Loss logger callback ─────────────────────────────────────────────────
     loss_logger = JsonlLossLogger(cfg["log_path"], cfg["log_steps"])
 
     class _LossCallback(TrainerCallback):
         def on_log(self, args, state, control, logs=None, **kwargs):
             loss_logger.on_log(args, state, control, logs=logs, **kwargs)
 
-    # ── SFTTrainer ────────────────────────────────────────────────────────────
     _tick(f"\n[7/7] Initialising SFTTrainer …\n"
           f"      Tokenising {len(dataset)} examples "
           f"(max_seq_length={cfg['max_seq_length']}) — may take 1–2 min …")
@@ -413,7 +344,6 @@ def run_finetune(cfg: dict) -> None:
           f"{len(trainer.train_dataset)} training examples"
           + (f" / {len(eval_data)} eval examples." if eval_data else "."))
 
-    # ── Train ─────────────────────────────────────────────────────────────────
     _eff_batch   = cfg["per_device_batch"] * cfg["grad_accumulation"]
     _total_steps = (len(trainer.train_dataset) // _eff_batch) * cfg["epochs"]
     _tick(f"\nStarting training …\n"
@@ -426,13 +356,11 @@ def run_finetune(cfg: dict) -> None:
     elapsed = time.time() - t0
     _tick(f"\nTraining complete in {elapsed / 60:.1f} min")
 
-    # ── Save LoRA adapter ─────────────────────────────────────────────────────
     _tick(f"\nSaving LoRA adapter → {cfg['adapter_output']}")
     model.save_pretrained(cfg["adapter_output"])
     tokenizer.save_pretrained(cfg["adapter_output"])
     _tick("  Adapter saved.")
 
-    # ── Save merged (adapter + base weights fused) ─────────────────────────
     if not cfg.get("dry_run"):
         _tick(f"\nSaving merged model → {cfg['merged_output']}\n"
               f"  (fusing + dequantising LoRA weights to fp16 — may take several minutes)")
@@ -446,7 +374,7 @@ def run_finetune(cfg: dict) -> None:
         _tick("  [dry-run] Skipping merged model save.")
         _tick("\n[dry-run] Testing inference on one example...")
         FastLanguageModel.for_inference(model)
-        # Build prompt from messages (system + user only — no assistant turn)
+        
         _msgs  = formatted[0]["messages"][:2]
         sample = tokenizer.apply_chat_template(
             _msgs, tokenize=False, add_generation_prompt=True
@@ -455,7 +383,6 @@ def run_finetune(cfg: dict) -> None:
         outputs = model.generate(**inputs, max_new_tokens=256)
         _tick(tokenizer.decode(outputs[0], skip_special_tokens=True)[-500:])
 
-    # ── Training summary ──────────────────────────────────────────────────────
     final_loss  = train_result.training_loss
     best_loss   = loss_logger.best_loss
     best_step   = loss_logger.best_step
@@ -476,11 +403,6 @@ def run_finetune(cfg: dict) -> None:
              if not cfg.get("dry_run") else "") + "\n"
           f"  Loss log                 : {cfg['log_path']}\n"
           + "=" * 64)
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 def parse_args() -> dict:
     parser = argparse.ArgumentParser(
@@ -528,13 +450,7 @@ def parse_args() -> dict:
         merge_only        = args.merge_only,
     )
 
-
-# ---------------------------------------------------------------------------
-# Merge-only path (--merge-only)
-# ---------------------------------------------------------------------------
-
 def run_merge_only(cfg: dict) -> None:
-    """Load base model + saved LoRA adapter, fuse weights, save merged model."""
     from unsloth import FastLanguageModel
 
     adapter_path = cfg["adapter_output"]
@@ -550,7 +466,7 @@ def run_merge_only(cfg: dict) -> None:
 
     _tick("Loading base model + adapter …")
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name     = adapter_path,   # loads base + applies adapter
+        model_name     = adapter_path,
         max_seq_length = cfg["max_seq_length"],
         load_in_4bit   = cfg["load_in_4bit"],
     )

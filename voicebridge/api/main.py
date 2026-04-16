@@ -34,18 +34,10 @@ from models.transcription import GemmaTranscriber
 from pipeline.pdf_generator import generate_triage_pdf
 from pipeline.triage import TriageClassifier
 
-# ---------------------------------------------------------------------------
-# Model paths
-# ---------------------------------------------------------------------------
-
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _EDGE_MODEL_PATH  = str(_REPO_ROOT / "models" / "gemma4-e4b-it")
 _FULL_MODEL_PATH  = str(_REPO_ROOT / "models" / "gemma4-27b-moe")
 _FRONTEND_DIR     = _REPO_ROOT / "frontend"
-
-# ---------------------------------------------------------------------------
-# Lazy-loaded model singletons
-# ---------------------------------------------------------------------------
 
 _edge_tx: GemmaTranscriber | None = None
 _clf: TriageClassifier | None = None
@@ -67,7 +59,6 @@ def _load_models() -> None:
 
         _edge_tx = GemmaTranscriber(_EDGE_MODEL_PATH)
 
-        # Use the full model for triage if available, otherwise fall back to edge
         triage_path = full_path if full_path.exists() else edge_path
         triage_tx = GemmaTranscriber(str(triage_path)) if full_path.exists() else _edge_tx
         _clf = TriageClassifier(triage_tx)
@@ -87,10 +78,6 @@ def _get_models() -> tuple[GemmaTranscriber, TriageClassifier]:
     return _edge_tx, _clf
 
 
-# ---------------------------------------------------------------------------
-# App lifecycle
-# ---------------------------------------------------------------------------
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -106,14 +93,9 @@ app = FastAPI(
 
 app.include_router(audio_router)
 
-# Serve the frontend as static files if the directory has content
 if _FRONTEND_DIR.exists() and any(_FRONTEND_DIR.iterdir()):
     app.mount("/ui", StaticFiles(directory=str(_FRONTEND_DIR), html=True), name="frontend")
 
-
-# ---------------------------------------------------------------------------
-# Helper — shared intake logic
-# ---------------------------------------------------------------------------
 
 async def _run_intake(file: UploadFile):
     """Shared core: audio file → (record_id, TriageOutput)."""
@@ -132,10 +114,6 @@ async def _run_intake(file: UploadFile):
     return record_id, triage
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
-
 @app.post("/intake")
 async def intake(file: UploadFile, bg: BackgroundTasks):
     """
@@ -146,7 +124,6 @@ async def intake(file: UploadFile, bg: BackgroundTasks):
     - Persists result to SQLite in the background
     """
     record_id, triage = await _run_intake(file)
-    # mode='json' serialises enums to their string values for SQLite storage
     triage_dict = triage.model_dump(mode="json")
     bg.add_task(save_record, record_id, triage_dict)
     return {"record_id": record_id, "triage": triage_dict}

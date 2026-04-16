@@ -38,42 +38,20 @@ if str(_REPO_ROOT_PT) not in sys.path:
 
 from pipeline.llama_infer import run_inference
 
-# ===========================================================================
-#  ██████╗ ██████╗ ███╗   ██╗███████╗██╗ ██████╗
-# ██╔════╝██╔═══██╗████╗  ██║██╔════╝██║██╔════╝
-# ██║     ██║   ██║██╔██╗ ██║█████╗  ██║██║  ███╗
-# ██║     ██║   ██║██║╚██╗██║██╔══╝  ██║██║   ██║
-# ╚██████╗╚██████╔╝██║ ╚████║██║     ██║╚██████╔╝
-#  ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝
-#  Edit everything in this section. Nothing below the divider needs touching.
-# ===========================================================================
-
-# ── Model path ───────────────────────────────────────────────────────────────
 FINE_GGUF = os.environ.get(
     "FINE_GGUF",
     str(Path.home() / "voicebridge-finetuned-q4km.gguf")
 )
 LLAMA_CLI = str(Path.home() / "llama.cpp" / "build" / "bin" / "llama-cli")
 
-# ── Sampling parameters ──────────────────────────────────────────────────────
-# Try different values to find what gives the most consistent JSON output.
 TEMP           = 0.1    # 0.0 = fully deterministic, 0.2 = slight variation
 REPEAT_PENALTY = 1.3    # penalise repeating tokens. try 1.1, 1.3, 1.5
 MAX_TOKENS     = 1024    # max output length. try 300, 512, 600
 GPU_LAYERS     = 99     # keep at 99 for RTX 5090
 THREADS        = 4
 
-# ── System prompt ─────────────────────────────────────────────────────────────
-# Loaded from voicebridge/prompts/triage_system.txt — edit that file to change
-# the prompt. compare_models.py reads the same file.
-
 _PROMPT_FILE = Path(__file__).parent.parent / "prompts" / "triage_system.txt"
 SYSTEM_PROMPT = _PROMPT_FILE.read_text(encoding="utf-8")
-
-# ===========================================================================
-#  10 TEST CASES — 2 per level, covering 5 languages
-#  Do not change the expected levels unless you disagree clinically.
-# ===========================================================================
 
 TEST_CASES = [
     # ── RED ──────────────────────────────────────────────────────────────────
@@ -148,10 +126,6 @@ TEST_CASES = [
         ),
     },
 ]
-
-# ===========================================================================
-#  ENGINE — do not edit below this line
-# ===========================================================================
 
 _LANG_NAMES = {
     "en": "English", "sw": "Swahili", "tl": "Tagalog",
@@ -253,7 +227,6 @@ def main() -> None:
                         help="Skip inference, return lang code as predicted level")
     args = parser.parse_args()
 
-    # Preflight checks (skipped in dry-run)
     if not args.dry_run:
         if not Path(LLAMA_CLI).exists():
             print(f"[ERROR] llama-cli not found: {LLAMA_CLI}")

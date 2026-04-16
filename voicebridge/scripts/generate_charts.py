@@ -26,14 +26,10 @@ import sys
 from pathlib import Path
 
 import matplotlib
-matplotlib.use("Agg")   # non-interactive backend — no display needed
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
-
-# ---------------------------------------------------------------------------
-# Colour palette — matches SATS triage colours
-# ---------------------------------------------------------------------------
 
 SATS_COLOURS = {
     "red":    "#E24B4A",
@@ -51,14 +47,8 @@ LANG_LABELS = {
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
-# Colours for base vs tuned series
-_BASE_COL  = "#78909C"   # blue-grey
-_TUNED_COL = "#42A5F5"   # mid-blue
-
-
-# ---------------------------------------------------------------------------
-# Chart builders
-# ---------------------------------------------------------------------------
+_BASE_COL  = "#78909C"
+_TUNED_COL = "#42A5F5"
 
 def _add_value_labels(ax, bars, fmt="{:.0%}", offset=0.01):
     for bar in bars:
@@ -72,7 +62,6 @@ def _add_value_labels(ax, bars, fmt="{:.0%}", offset=0.01):
 
 
 def panel_overall_comparison(ax, data: dict) -> None:
-    """Grouped bar chart: base vs tuned for three headline metrics."""
     base  = data["base"]
     tuned = data["tuned"]
 
@@ -100,7 +89,6 @@ def panel_overall_comparison(ax, data: dict) -> None:
     _add_value_labels(ax, bars_base)
     _add_value_labels(ax, bars_tuned)
 
-    # Unsafe count annotation
     unsafe_t = tuned["unsafe_count"]
     colour = "#E24B4A" if unsafe_t > 0 else "#4CAF50"
     label  = f"Tuned: {unsafe_t} unsafe" if unsafe_t > 0 else "Tuned: 0 unsafe"
@@ -109,7 +97,6 @@ def panel_overall_comparison(ax, data: dict) -> None:
 
 
 def panel_per_level_comparison(ax, data: dict) -> None:
-    """Grouped bars per SATS level: base vs tuned."""
     base_pl  = data["base"]["per_level"]
     tuned_pl = data["tuned"]["per_level"]
 
@@ -127,7 +114,6 @@ def panel_per_level_comparison(ax, data: dict) -> None:
     bars_tuned = ax.bar(x + width / 2, tuned_accs, width,
                         color=_TUNED_COL, label="Tuned", zorder=3)
 
-    # Colour the x-tick labels with SATS colours
     ax.set_xticks(x)
     ax.set_xticklabels([l.capitalize() for l in levels], fontsize=9)
     for tick, lv in zip(ax.get_xticklabels(), levels):
@@ -146,7 +132,6 @@ def panel_per_level_comparison(ax, data: dict) -> None:
 
 
 def panel_per_language(ax, data: dict) -> None:
-    """Tuned-only accuracy per language."""
     per_lang = data["tuned"]["per_language"]
     langs    = sorted(per_lang.keys())
     accs     = [per_lang[l]["accuracy"] for l in langs]
@@ -164,7 +149,6 @@ def panel_per_language(ax, data: dict) -> None:
 
 
 def panel_latency(ax, data: dict) -> None:
-    """Tuned model latency bars vs 8-second target."""
     lat      = data["tuned_latency"]
     hardware = data["meta"].get("hardware", "")
     target   = 8.0
@@ -198,7 +182,6 @@ def panel_latency(ax, data: dict) -> None:
 
 
 def panel_delta(ax, data: dict) -> None:
-    """Bar chart of tuned − base deltas for headline metrics."""
     delta = data["delta"]
 
     metric_keys   = ["exact_match_accuracy", "safe_escalation_rate", "validator_agreement"]
@@ -223,7 +206,6 @@ def panel_delta(ax, data: dict) -> None:
             fontsize=9, fontweight="bold",
         )
 
-    # Unsafe count delta as annotation
     unsafe_delta = delta.get("unsafe_count", 0)
     colour = "#4CAF50" if unsafe_delta <= 0 else "#E24B4A"
     label  = f"Unsafe count Δ: {unsafe_delta:+d}"
@@ -232,7 +214,6 @@ def panel_delta(ax, data: dict) -> None:
 
 
 def panel_case_heatmap(ax, data: dict) -> None:
-    """Per-case heatmap for the tuned model."""
     cases = data["tuned"]["case_results"]
     ids   = [c["id"] for c in cases]
     cols  = ["Correct", "Safe", "Validator\nSafe"]
@@ -250,7 +231,6 @@ def panel_case_heatmap(ax, data: dict) -> None:
     ax.set_yticklabels(cols, fontsize=9)
     ax.set_title("Per-Case Results (Tuned)", fontsize=11, fontweight="bold")
 
-    # Annotate cells
     for j in range(len(cols)):
         for i, case in enumerate(cases):
             val  = matrix[i, j]
@@ -259,7 +239,6 @@ def panel_case_heatmap(ax, data: dict) -> None:
             ax.text(i, j, tick, ha="center", va="center",
                     fontsize=8, color=colour, fontweight="bold")
 
-    # Predicted label below x-axis ticks
     for i, c in enumerate(cases):
         label = f"{c['predicted'][0].upper()}"
         col   = SATS_COLOURS.get(c["predicted"], "#999")
@@ -269,11 +248,6 @@ def panel_case_heatmap(ax, data: dict) -> None:
                 transform=ax.transData)
 
     plt.colorbar(im, ax=ax, fraction=0.03, pad=0.04)
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 def generate_charts(input_path: Path, output_path: Path) -> None:
     if not input_path.exists():

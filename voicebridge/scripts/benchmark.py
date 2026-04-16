@@ -1,5 +1,5 @@
 """
-VoiceBridge Benchmark Suite — Task 3.3
+VoiceBridge Benchmark Suite
 =======================================
 Measures:
   • Triage accuracy        — % of cases where predicted level == expected
@@ -37,22 +37,13 @@ from typing import Optional
 
 import numpy as np
 
-# ---------------------------------------------------------------------------
-# Path setup — allow running from repo root or scripts/
-# ---------------------------------------------------------------------------
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT))
 
 from data.clinical_validation import validate_triage
 from pipeline.triage import TriageLevel, TriageOutput
 
-# ---------------------------------------------------------------------------
-# 20 benchmark test cases — 4 per SATS level, 5 languages represented
-# (sw, tl, ha, bn, en — matching clinical_validation RED_FLAG_KEYWORDS)
-# ---------------------------------------------------------------------------
-
 TEST_CASES: list[dict] = [
-    # ── RED (4 cases) ────────────────────────────────────────────────────────
     {
         "id":       "R01",
         "lang":     "sw",
@@ -90,7 +81,6 @@ TEST_CASES: list[dict] = [
         "note":     "Eclampsia — emergency discriminator",
     },
 
-    # ── ORANGE (4 cases) ─────────────────────────────────────────────────────
     {
         "id":       "O01",
         "lang":     "bn",
@@ -128,7 +118,6 @@ TEST_CASES: list[dict] = [
         "note":     "Glucose < 3 + AVPU=V → RED upgrade (captures severe hypoglycaemia)",
     },
 
-    # ── YELLOW (4 cases) ─────────────────────────────────────────────────────
     {
         "id":       "Y01",
         "lang":     "ha",
@@ -166,7 +155,6 @@ TEST_CASES: list[dict] = [
         "note":     "Head injury — urgent discriminator",
     },
 
-    # ── GREEN (4 cases) ──────────────────────────────────────────────────────
     {
         "id":       "G01",
         "lang":     "tl",
@@ -204,7 +192,6 @@ TEST_CASES: list[dict] = [
         "note":     "Chronic cough — TB screening needed but not urgent",
     },
 
-    # ── BLUE (4 cases) ───────────────────────────────────────────────────────
     {
         "id":       "B01",
         "lang":     "en",
@@ -243,14 +230,6 @@ TEST_CASES: list[dict] = [
     },
 ]
 
-
-# ---------------------------------------------------------------------------
-# MockTriageClassifier — deterministic, no model download required
-# Simulates realistic LLM behaviour: 85% accuracy with plausible errors
-# ---------------------------------------------------------------------------
-
-# Deliberate imperfections mirror real LLM behaviour (slight over- and
-# under-calls) so safe_escalation_rate tests are meaningful.
 _MOCK_PREDICTIONS: dict[str, str] = {
     "R01": "red",    "R02": "red",    "R03": "red",    "R04": "red",
     "O01": "orange", "O02": "orange", "O03": "red",    "O04": "red",
@@ -259,32 +238,16 @@ _MOCK_PREDICTIONS: dict[str, str] = {
     "B01": "blue",   "B02": "blue",   "B03": "red",    "B04": "blue",
 }
 
-# Simulated per-call latency distribution (seconds) — calibrated to
-# approximate E4B on Raspberry Pi 5 for a 10-second audio clip.
 _MOCK_LATENCY_MEAN = 4.8
 _MOCK_LATENCY_STD  = 0.9
 
 
 class MockTriageClassifier:
-    """
-    Deterministic mock classifier for CPU benchmark runs.
-
-    Returns pre-defined predictions matching the TEST_CASES above.
-    Latency is simulated using a Gaussian distribution calibrated to
-    approximate Gemma 4 E4B on Raspberry Pi 5.
-    """
-
     def classify_case(self, case: dict) -> tuple[TriageOutput, float]:
-        """
-        Return (TriageOutput, simulated_latency_s) for a benchmark case.
-        """
         t0 = time.perf_counter()
         predicted = _MOCK_PREDICTIONS.get(case["id"], "green")
 
-        # Simulate inference latency
         sleep_s = max(0.001, np.random.normal(_MOCK_LATENCY_MEAN, _MOCK_LATENCY_STD))
-        # Don't actually sleep — we measure wall-clock of our logic only,
-        # and record the *simulated* Pi-5 latency separately.
         wall_s = time.perf_counter() - t0
 
         result = TriageOutput(
@@ -301,7 +264,7 @@ class MockTriageClassifier:
             source_language=case["lang"],
             raw_transcript=case["text_en"],
         )
-        return result, sleep_s   # return simulated latency, not wall-clock
+        return result, sleep_s
 
 
 def _level_wait(level: str) -> str:
@@ -312,21 +275,11 @@ def _level_wait(level: str) -> str:
         "green": "4 hours",
         "blue": "N/A (expectant)",
     }.get(level, "unknown")
-
-
-# ---------------------------------------------------------------------------
-# Accuracy + safety metrics
-# ---------------------------------------------------------------------------
-
+    
 _LEVEL_ORDER = {"blue": 0, "green": 1, "yellow": 2, "orange": 3, "red": 4}
 
 
 def _is_safe(predicted: str, expected: str) -> bool:
-    """
-    Safe = predicted urgency >= expected urgency.
-    Over-triage is safe; under-triage is unsafe.
-    BLUE is expectant — treated as lowest urgency for safety comparison.
-    """
     return _LEVEL_ORDER.get(predicted, 0) >= _LEVEL_ORDER.get(expected, 0)
 
 
@@ -416,11 +369,6 @@ def run_accuracy(clf: MockTriageClassifier) -> AccuracyResult:
         case_results=case_results,
     )
 
-
-# ---------------------------------------------------------------------------
-# Latency benchmark
-# ---------------------------------------------------------------------------
-
 @dataclass
 class LatencyResult:
     model:          str
@@ -433,16 +381,12 @@ class LatencyResult:
     p50_s:          float
     min_s:          float
     max_s:          float
-    simulated:      bool   # True = mock latency, not real hardware
+    simulated:      bool
 
 
 def run_latency(clf: MockTriageClassifier, n: int = 20) -> LatencyResult:
-    """
-    Record simulated E4B latency for a 10-second audio clip.
-    Real hardware numbers replace these in Phase 4.
-    """
     latencies: list[float] = []
-    dummy_case = TEST_CASES[0]  # reuse first case for repeated inference
+    dummy_case = TEST_CASES[0]
 
     for _ in range(n):
         _, lat_s = clf.classify_case(dummy_case)
@@ -462,11 +406,6 @@ def run_latency(clf: MockTriageClassifier, n: int = 20) -> LatencyResult:
         max_s=round(latencies[-1], 2),
         simulated=True,
     )
-
-
-# ---------------------------------------------------------------------------
-# Report formatting
-# ---------------------------------------------------------------------------
 
 def _bar(value: float, width: int = 20) -> str:
     filled = round(value * width)
@@ -526,11 +465,6 @@ def print_report(acc: AccuracyResult, lat: LatencyResult) -> None:
     else:
         print("  ✓  No unsafe under-triage cases detected")
     print()
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="VoiceBridge benchmark suite")

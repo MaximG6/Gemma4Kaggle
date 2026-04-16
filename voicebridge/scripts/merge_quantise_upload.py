@@ -46,10 +46,6 @@ import sys
 import time
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
 ADAPTER_REPO    = "OminousDude/voicebridge-adapter"
 BASE_MODEL_ID   = "google/gemma-4-e4b-it"
 UPLOAD_REPO     = "OminousDude/voicebridge-gemma4"
@@ -64,10 +60,6 @@ LLAMA_ROOT      = Path.home() / "llama.cpp"
 CONVERT_SCRIPT  = LLAMA_ROOT / "convert_hf_to_gguf.py"
 QUANTIZE_BIN    = LLAMA_ROOT / "build" / "bin" / "llama-quantize"
 CLI_BIN         = LLAMA_ROOT / "build" / "bin" / "llama-cli"
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def banner(title: str) -> None:
     print("\n" + "=" * 64)
@@ -88,11 +80,6 @@ def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
 
 def gb(path: Path) -> float:
     return path.stat().st_size / 1e9
-
-
-# ---------------------------------------------------------------------------
-# Step 1 — Preflight checks
-# ---------------------------------------------------------------------------
 
 def preflight(hf_token: str, auto_yes: bool = False) -> None:
     banner("Step 1 — Preflight checks")
@@ -124,7 +111,6 @@ def preflight(hf_token: str, auto_yes: bool = False) -> None:
     )
     print(f"✓ llama-cli found")
 
-    # Install psutil if missing
     try:
         import psutil
     except ImportError:
@@ -152,11 +138,6 @@ def preflight(hf_token: str, auto_yes: bool = False) -> None:
 
     print("✓ All preflight checks passed")
 
-
-# ---------------------------------------------------------------------------
-# Step 2 — Download adapter
-# ---------------------------------------------------------------------------
-
 def download_adapter(hf_token: str) -> Path:
     banner("Step 2 — Download adapter from HuggingFace")
 
@@ -177,11 +158,6 @@ def download_adapter(hf_token: str) -> Path:
     print(f"✓ adapter_model.safetensors: {adapter_size:.0f} MB")
     print(f"✓ All adapter files present: {files}")
     return adapter_path
-
-
-# ---------------------------------------------------------------------------
-# Step 3 — Load base model to CPU
-# ---------------------------------------------------------------------------
 
 def load_base_model(hf_token: str, use_gpu: bool = False):
     import torch
@@ -246,19 +222,12 @@ def load_base_model(hf_token: str, use_gpu: bool = False):
 
     return model, tokenizer
 
-
-# ---------------------------------------------------------------------------
-# Step 4 — Apply and merge adapter
-# ---------------------------------------------------------------------------
-
 def merge_adapter(model, adapter_path: Path, use_gpu: bool = False):
     banner("Step 4 — Apply and merge LoRA adapter")
 
     import torch.nn as nn
     from peft import PeftModel
 
-    # Unwrap Gemma4ClippableLinear — PEFT does not recognise this Gemma 4
-    # specific wrapper and raises ValueError without this fix.
     print("Unwrapping Gemma4ClippableLinear layers...")
     unwrapped = 0
     for name, module in list(model.named_modules()):
@@ -288,25 +257,18 @@ def merge_adapter(model, adapter_path: Path, use_gpu: bool = False):
     print(f"✓ Adapter merged in {elapsed:.0f}s")
     return model
 
-
-# ---------------------------------------------------------------------------
-# Step 5 — Verify weights changed
-# ---------------------------------------------------------------------------
-
 def verify_weights(model, hf_token: str) -> float:
     banner("Step 5 — Verify fine-tune was applied")
 
     import torch
     from transformers import AutoModelForCausalLM
 
-    # Confirm no LoRA layers remain
     has_lora = any("lora" in n.lower() for n, _ in model.named_modules())
     if has_lora:
         print("⚠  LoRA layers still present — merge may not have completed")
     else:
         print("✓ No LoRA layers present — merge confirmed")
 
-    # Move merged model to CPU before loading base to avoid VRAM OOM
     print("Moving merged model to CPU for comparison...")
     model = model.cpu()
     torch.cuda.empty_cache()
@@ -367,11 +329,6 @@ def verify_weights(model, hf_token: str) -> float:
         )
     return pct
 
-
-# ---------------------------------------------------------------------------
-# Step 6 — Save merged model
-# ---------------------------------------------------------------------------
-
 def save_merged(model, tokenizer) -> None:
     banner("Step 6 — Save merged model locally")
 
@@ -392,11 +349,6 @@ def save_merged(model, tokenizer) -> None:
     gc.collect()
     print("✓ Model freed from RAM after save")
 
-
-# ---------------------------------------------------------------------------
-# Step 7 — Convert to fp16 GGUF
-# ---------------------------------------------------------------------------
-
 def convert_to_f16() -> None:
     banner("Step 7 — Convert merged model to fp16 GGUF")
 
@@ -412,11 +364,6 @@ def convert_to_f16() -> None:
 
     assert F16_GGUF.exists(), f"fp16 GGUF not created at {F16_GGUF}"
     print(f"✓ fp16 GGUF: {F16_GGUF} ({gb(F16_GGUF):.2f} GB)")
-
-
-# ---------------------------------------------------------------------------
-# Step 8 — Quantise to Q4_K_M
-# ---------------------------------------------------------------------------
 
 def quantise_q4km() -> None:
     banner("Step 8 — Quantise to Q4_K_M")
@@ -435,11 +382,6 @@ def quantise_q4km() -> None:
     q4km_gb = gb(Q4KM_GGUF)
     print(f"✓ Q4_K_M GGUF: {Q4KM_GGUF} ({q4km_gb:.2f} GB)")
     print(f"✓ Compression ratio: {f16_gb / q4km_gb:.2f}x")
-
-
-# ---------------------------------------------------------------------------
-# Step 9 — Inference test
-# ---------------------------------------------------------------------------
 
 def inference_test() -> dict:
     banner("Step 9 — Inference test")
@@ -508,11 +450,6 @@ def inference_test() -> dict:
         print("   Review raw output above manually")
         return {}
 
-
-# ---------------------------------------------------------------------------
-# Step 10 — Upload to HuggingFace
-# ---------------------------------------------------------------------------
-
 def upload(hf_token: str) -> None:
     banner("Step 10 — Upload GGUF to HuggingFace")
 
@@ -531,11 +468,6 @@ def upload(hf_token: str) -> None:
     )
     print(f"✓ Upload complete")
     print(f"✓ https://huggingface.co/{UPLOAD_REPO}")
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -575,7 +507,6 @@ def main() -> None:
         print(f"  Est. RAM      : ~8 GB (fp16)")
         print(f"  Est. time     : ~60-90 min total")
 
-    # ── Run all steps ──────────────────────────────────────────────
     preflight(HF_TOKEN, auto_yes=args.yes)
     adapter_path     = download_adapter(HF_TOKEN)
     model, tokenizer = load_base_model(HF_TOKEN, use_gpu=args.gpu)
@@ -597,7 +528,6 @@ def main() -> None:
     quantise_q4km()
     parsed = inference_test()
 
-    # ── Upload ────────────────────────────────────────────────────
     banner("Ready to upload")
     triage_ok = parsed.get("triage_level", "").lower() == "red"
     schema_ok = all(
@@ -623,7 +553,6 @@ def main() -> None:
             print("Upload skipped. Run manually when ready:")
             print(f"  hf upload {UPLOAD_REPO} {Q4KM_GGUF} {UPLOAD_FILENAME}")
 
-    # ── Save run log ───────────────────────────────────────────────
     elapsed = time.time() - t_start
     log = {
         "adapter_repo":   ADAPTER_REPO,

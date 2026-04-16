@@ -1,0 +1,8 @@
+temp 0.0 - Worse
+temp 0.1 - Baseline good ------
+temp 0.2 - good better? ------ worse
+temp 0.3 - worse prediction acc and worse json format
+
+repeat penalty 1.1 - very similar score to baseline
+repeat penalty 1.2 - 
+repeat penalty 1.3 - baseline good

@@ -27,8 +27,6 @@ from sqlalchemy.pool import StaticPool
 _DB_PATH = Path(__file__).resolve().parents[1] / "voicebridge.db"
 _DB_URL = os.environ.get("VOICEBRIDGE_DB_URL", f"sqlite:///{_DB_PATH}")
 
-# In-memory SQLite (used in tests) requires StaticPool so all sessions
-# share the same single connection and therefore the same database.
 _is_memory = ":memory:" in _DB_URL
 if _is_memory:
     engine = create_engine(
@@ -56,7 +54,7 @@ class TriageRecord(Base):
     source_language   = Column(String(10), nullable=False)
     referral_needed   = Column(Boolean, nullable=False)
     confidence_score  = Column(Float, nullable=False)
-    full_json         = Column(Text, nullable=False)  # JSON-serialised TriageOutput
+    full_json         = Column(Text, nullable=False)
 
 
 def init_db() -> None:
