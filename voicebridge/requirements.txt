@@ -1,15 +1,44 @@
+# ── API / serving ─────────────────────────────────────────────────────────
 fastapi
 uvicorn[standard]
 httpx
 pydantic
 sqlalchemy
 python-multipart
+
+# ── Audio processing ──────────────────────────────────────────────────────
 librosa
 soundfile
+
+# ── PDF generation ────────────────────────────────────────────────────────
 reportlab
+
+# ── Language detection ────────────────────────────────────────────────────
 langdetect
-pytest
-pytest-anyio
-matplotlib
+
+# ── ML / model stack ──────────────────────────────────────────────────────
+torch
 transformers
 accelerate
+datasets
+peft
+trl
+
+# ── Fine-tuning (install separately — requires CUDA build):
+# pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+unsloth
+
+# ── HuggingFace / model hub ───────────────────────────────────────────────
+huggingface_hub
+
+# ── Notebook / visualisation ──────────────────────────────────────────────
+matplotlib
+numpy
+tqdm
+
+# ── System monitoring ─────────────────────────────────────────────────────
+psutil
+
+# ── Testing ───────────────────────────────────────────────────────────────
+pytest
+pytest-anyio
