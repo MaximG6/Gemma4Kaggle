@@ -1,0 +1,1670 @@
+[
+  {
+    "id": "R01",
+    "lang": "sw",
+    "level": "red",
+    "text_en": "Patient not breathing, lips blue, no pulse. Bystander CPR in progress.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "apnoea",
+      "no palpable pulse",
+      "AVPU = U",
+      "cyanosis"
+    ],
+    "note": "Cardiac arrest — emergency discriminator (apnoea, AVPU=U)"
+  },
+  {
+    "id": "R02",
+    "lang": "tl",
+    "level": "red",
+    "text_en": "Child 3 years. Active seizure ongoing for 8 minutes. Unresponsive. Eyes rolled back.",
+    "vitals": {
+      "avpu": "U"
+    },
+    "flags": [
+      "active seizure > 5 min",
+      "AVPU = U",
+      "status epilepticus"
+    ],
+    "note": "Status epilepticus — emergency discriminator"
+  },
+  {
+    "id": "R03",
+    "lang": "ha",
+    "level": "red",
+    "text_en": "Adult male. Uncontrolled bleeding from femoral wound. RR 32, HR 148, SBP 72, AVPU P.",
+    "vitals": {
+      "rr": 32,
+      "hr": 148,
+      "sbp": 72,
+      "avpu": "P"
+    },
+    "flags": [
+      "uncontrolled haemorrhage",
+      "AVPU = P",
+      "RR > 29",
+      "HR > 150"
+    ],
+    "note": "Haemorrhagic shock — TEWS >= 7 + emergency discriminator"
+  },
+  {
+    "id": "R04",
+    "lang": "en",
+    "level": "red",
+    "text_en": "Woman 28 weeks pregnant. Seized 2 minutes ago. Still convulsing. BP 180/120.",
+    "vitals": {
+      "sbp": 180,
+      "avpu": "U"
+    },
+    "flags": [
+      "eclampsia",
+      "seizure in pregnancy",
+      "active convulsion"
+    ],
+    "note": "Eclampsia — emergency discriminator"
+  },
+  {
+    "id": "R05",
+    "lang": "bn",
+    "level": "red",
+    "text_en": "Adult female. Severe allergic reaction after eating shellfish. Throat swelling, stridor audible. SpO2 82%, HR 138, SBP 74. Unresponsive to voice.",
+    "vitals": {
+      "spo2": 82,
+      "hr": 138,
+      "sbp": 74,
+      "avpu": "U"
+    },
+    "flags": [
+      "SpO2 < 85",
+      "SBP < 80 with HR > 130",
+      "AVPU = U",
+      "anaphylaxis"
+    ],
+    "note": "Anaphylactic shock — SpO2 < 85 and SBP < 80 with HR > 130"
+  },
+  {
+    "id": "R06",
+    "lang": "ha",
+    "level": "red",
+    "text_en": "Child 2 years. Active generalised seizure lasting 12 minutes. Unresponsive between episodes. High fever 40.1°C.",
+    "vitals": {
+      "temp": 40.1,
+      "avpu": "U"
+    },
+    "flags": [
+      "active seizure > 5 min",
+      "AVPU = U",
+      "status epilepticus"
+    ],
+    "note": "Status epilepticus with fever — emergency discriminator"
+  },
+  {
+    "id": "R07",
+    "lang": "tl",
+    "level": "red",
+    "text_en": "Adult male. Stabbing injury to chest. RR 38, HR 140, SBP 78. Unresponsive to voice. Trachea deviated.",
+    "vitals": {
+      "rr": 38,
+      "hr": 140,
+      "sbp": 78,
+      "avpu": "U"
+    },
+    "flags": [
+      "tension pneumothorax",
+      "SBP < 80 with HR > 130",
+      "AVPU = U"
+    ],
+    "note": "Tension pneumothorax — SBP < 80 with HR > 130"
+  },
+  {
+    "id": "R08",
+    "lang": "en",
+    "level": "red",
+    "text_en": "Woman 32 weeks pregnant. Generalised tonic-clonic seizure ongoing. BP 190/130. Unresponsive.",
+    "vitals": {
+      "sbp": 190,
+      "avpu": "U"
+    },
+    "flags": [
+      "eclampsia",
+      "seizure in pregnancy",
+      "active convulsion",
+      "BP 190/130"
+    ],
+    "note": "Eclampsia — emergency discriminator"
+  },
+  {
+    "id": "R09",
+    "lang": "sw",
+    "level": "red",
+    "text_en": "Child 5 years. Near drowning. Pulled from water unresponsive. No spontaneous breathing. No pulse. Family confirms child was swimming 5 minutes ago. Rescuer performing mouth-to-mouth.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "apnoea",
+      "no palpable pulse",
+      "AVPU = U",
+      "drowning",
+      "recent submersion"
+    ],
+    "note": "Drowning cardiac arrest — recent submersion confirmed, CPR in progress"
+  },
+  {
+    "id": "R10",
+    "lang": "bn",
+    "level": "red",
+    "text_en": "Adult male. Crush injury to abdomen from road accident. HR 158, SBP 74, RR 34, AVPU = P. Abdomen rigid.",
+    "vitals": {
+      "rr": 34,
+      "hr": 158,
+      "sbp": 74,
+      "avpu": "P"
+    },
+    "flags": [
+      "SBP < 80 with HR > 130",
+      "abdominal trauma",
+      "AVPU = P"
+    ],
+    "note": "Haemorrhagic shock from abdominal trauma"
+  },
+  {
+    "id": "R11",
+    "lang": "tl",
+    "level": "red",
+    "text_en": "Infant 4 months. Not breathing, cyanotic. Brought in by mother who found baby unresponsive in cot 2 minutes ago. No pulse. CPR not yet started.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "apnoea",
+      "no palpable pulse",
+      "AVPU = U",
+      "SIDS suspected",
+      "recent collapse"
+    ],
+    "note": "Infant cardiac arrest — found 2 minutes ago, resuscitation indicated"
+  },
+  {
+    "id": "R12",
+    "lang": "ha",
+    "level": "red",
+    "text_en": "Adult female. Severe anaphylaxis after bee sting. Stridor, SpO2 82%, HR 142, SBP 76. Unresponsive.",
+    "vitals": {
+      "spo2": 82,
+      "hr": 142,
+      "sbp": 76,
+      "avpu": "U"
+    },
+    "flags": [
+      "SpO2 < 85",
+      "SBP < 80 with HR > 130",
+      "AVPU = U",
+      "anaphylaxis"
+    ],
+    "note": "Anaphylactic shock — SpO2 < 85 and SBP < 80 with HR > 130"
+  },
+  {
+    "id": "R13",
+    "lang": "en",
+    "level": "red",
+    "text_en": "Child 7 years. Active seizure ongoing 9 minutes. Postictal, unresponsive. No fever. Known epilepsy.",
+    "vitals": {
+      "avpu": "U"
+    },
+    "flags": [
+      "active seizure > 5 min",
+      "AVPU = U"
+    ],
+    "note": "Prolonged seizure — emergency discriminator"
+  },
+  {
+    "id": "R14",
+    "lang": "sw",
+    "level": "red",
+    "text_en": "Adult male. Electric shock at work site. Found collapsed. No breathing. No pulse. Bystanders started CPR.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "apnoea",
+      "no palpable pulse",
+      "AVPU = U",
+      "electrocution"
+    ],
+    "note": "Electrocution cardiac arrest — emergency discriminator"
+  },
+  {
+    "id": "R15",
+    "lang": "bn",
+    "level": "red",
+    "text_en": "Adult female. Post-partum haemorrhage. Delivered 1 hour ago. Soaked 6 pads. HR 152, SBP 72. AVPU = U, unresponsive. Haemorrhagic shock.",
+    "vitals": {
+      "hr": 152,
+      "sbp": 72,
+      "avpu": "U"
+    },
+    "flags": [
+      "SBP < 80 with HR > 130",
+      "post-partum haemorrhage",
+      "AVPU = U",
+      "haemorrhagic shock"
+    ],
+    "note": "Post-partum haemorrhage with haemorrhagic shock — SBP < 80 with HR > 130 and AVPU = U"
+  },
+  {
+    "id": "R16",
+    "lang": "tl",
+    "level": "red",
+    "text_en": "Woman 36 weeks pregnant. Fitting. No prior history. BP 210/140. Unresponsive between contractions.",
+    "vitals": {
+      "sbp": 210,
+      "avpu": "U"
+    },
+    "flags": [
+      "eclampsia",
+      "seizure in pregnancy",
+      "BP 210/140"
+    ],
+    "note": "Severe eclampsia — emergency discriminator"
+  },
+  {
+    "id": "R17",
+    "lang": "ha",
+    "level": "red",
+    "text_en": "Adult male. Gunshot wound to neck. Uncontrolled arterial bleeding. HR 162, SBP 68, RR 36, AVPU = P.",
+    "vitals": {
+      "rr": 36,
+      "hr": 162,
+      "sbp": 68,
+      "avpu": "P"
+    },
+    "flags": [
+      "uncontrolled haemorrhage",
+      "SBP < 80 with HR > 130",
+      "AVPU = P"
+    ],
+    "note": "Haemorrhagic shock — SBP < 80 with HR > 130"
+  },
+  {
+    "id": "R18",
+    "lang": "en",
+    "level": "red",
+    "text_en": "Child 18 months. Febrile seizure lasting 7 minutes. Still seizing on arrival. Unresponsive. Temp 40.3°C.",
+    "vitals": {
+      "temp": 40.3,
+      "avpu": "U"
+    },
+    "flags": [
+      "active seizure > 5 min",
+      "AVPU = U",
+      "febrile seizure"
+    ],
+    "note": "Prolonged febrile seizure — emergency discriminator"
+  },
+  {
+    "id": "R19",
+    "lang": "sw",
+    "level": "red",
+    "text_en": "Adult male. Found hanging, cut down 3 minutes ago. Cardiac arrest from hanging — resuscitation indicated and in progress. No breathing, no pulse currently. Bystanders performing CPR. Not yet confirmed dead.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "apnoea",
+      "no palpable pulse",
+      "AVPU = U",
+      "hanging",
+      "CPR in progress",
+      "resuscitation indicated"
+    ],
+    "note": "Hanging cardiac arrest — actively being resuscitated, confirmed less than 5 minutes down"
+  },
+  {
+    "id": "R20",
+    "lang": "bn",
+    "level": "red",
+    "text_en": "Adult female. Snake bite 30 minutes ago. SpO2 78%, HR 136, SBP 78, RR 32, AVPU = V.",
+    "vitals": {
+      "spo2": 78,
+      "hr": 136,
+      "sbp": 78,
+      "rr": 32,
+      "avpu": "V"
+    },
+    "flags": [
+      "SpO2 < 85",
+      "SBP < 80 with HR > 130",
+      "envenomation"
+    ],
+    "note": "Snake envenomation with shock"
+  },
+  {
+    "id": "O01",
+    "lang": "bn",
+    "level": "orange",
+    "text_en": "Adult male. Central chest pain 45 min. Radiates to left arm. Sweating. HR 112, RR 22.",
+    "vitals": {
+      "rr": 22,
+      "hr": 112,
+      "sbp": 130,
+      "avpu": "A"
+    },
+    "flags": [
+      "chest pain",
+      "suspected MI"
+    ],
+    "note": "Suspected ACS — very urgent discriminator"
+  },
+  {
+    "id": "O02",
+    "lang": "sw",
+    "level": "orange",
+    "text_en": "Female. Sudden weakness right arm and face droop 1 hour ago. Responds to voice only. HR 96, RR 20.",
+    "vitals": {
+      "rr": 20,
+      "hr": 96,
+      "sbp": 160,
+      "avpu": "V"
+    },
+    "flags": [
+      "suspected stroke",
+      "facial droop",
+      "arm weakness"
+    ],
+    "note": "Acute stroke — very urgent discriminator, AVPU=V"
+  },
+  {
+    "id": "O03",
+    "lang": "en",
+    "level": "orange",
+    "text_en": "Child 18 months. RR 52, HR 180, temperature 39.9°C, SpO2 91%. Grunting. Alert.",
+    "vitals": {
+      "rr": 52,
+      "hr": 180,
+      "temp": 39.9,
+      "spo2": 91.0,
+      "avpu": "A"
+    },
+    "flags": [
+      "RR > 50 (paediatric)",
+      "HR > 160 (paediatric)",
+      "SpO2 < 92%"
+    ],
+    "note": "ETAT paediatric — high RR + SpO2 < 92%"
+  },
+  {
+    "id": "O04",
+    "lang": "tl",
+    "level": "orange",
+    "text_en": "Adult. Diabetic. Blood glucose 1.8 mmol/L. Confused, responds to voice. HR 108, RR 18.",
+    "vitals": {
+      "rr": 18,
+      "hr": 108,
+      "glucose": 1.8,
+      "avpu": "V"
+    },
+    "flags": [
+      "hypoglycaemia with altered consciousness"
+    ],
+    "note": "Glucose < 3 + AVPU=V"
+  },
+  {
+    "id": "O05",
+    "lang": "ha",
+    "level": "orange",
+    "text_en": "Adult male. Sudden severe headache, worst of life, onset instantaneous. Vomiting. Fully alert. HR 88, RR 18, BP 168/100. Suspected subarachnoid haemorrhage requiring urgent CT.",
+    "vitals": {
+      "rr": 18,
+      "hr": 88,
+      "sbp": 168,
+      "avpu": "A"
+    },
+    "flags": [
+      "thunderclap headache",
+      "suspected subarachnoid haemorrhage",
+      "sudden onset worst headache"
+    ],
+    "note": "Suspected SAH — very urgent discriminator, time-critical neurological emergency"
+  },
+  {
+    "id": "O06",
+    "lang": "sw",
+    "level": "orange",
+    "text_en": "Child 3 years. RR 58, SpO2 88%, HR 168, temp 40°C. Intercostal recession. Alert but distressed.",
+    "vitals": {
+      "rr": 58,
+      "hr": 168,
+      "spo2": 88,
+      "temp": 40.0,
+      "avpu": "A"
+    },
+    "flags": [
+      "RR > 50 paediatric",
+      "SpO2 85-92%",
+      "severe respiratory distress"
+    ],
+    "note": "Severe paediatric respiratory distress — SpO2 85-92%"
+  },
+  {
+    "id": "O07",
+    "lang": "en",
+    "level": "orange",
+    "text_en": "Adult female. Sudden left arm weakness and slurred speech 2 hours ago. Alert, AVPU = V. HR 92, BP 178/104.",
+    "vitals": {
+      "hr": 92,
+      "sbp": 178,
+      "avpu": "V"
+    },
+    "flags": [
+      "suspected stroke",
+      "arm weakness",
+      "AVPU = V"
+    ],
+    "note": "Acute stroke — AVPU = V"
+  },
+  {
+    "id": "O08",
+    "lang": "tl",
+    "level": "orange",
+    "text_en": "Adult male. Fever 39.8°C, HR 118, RR 26, BP 88/56. Confusion. Suspected source: urinary infection.",
+    "vitals": {
+      "rr": 26,
+      "hr": 118,
+      "sbp": 88,
+      "temp": 39.8,
+      "avpu": "V"
+    },
+    "flags": [
+      "severe sepsis",
+      "AVPU = V",
+      "hypotension with tachycardia"
+    ],
+    "note": "Severe sepsis — AVPU = V"
+  },
+  {
+    "id": "O09",
+    "lang": "bn",
+    "level": "orange",
+    "text_en": "Adult female. Central chest tightness 1 hour. Jaw pain. Nausea. Diaphoretic. HR 108, BP 142/88. Alert.",
+    "vitals": {
+      "hr": 108,
+      "sbp": 142,
+      "avpu": "A"
+    },
+    "flags": [
+      "chest pain",
+      "suspected MI",
+      "diaphoresis"
+    ],
+    "note": "Suspected ACS in female — atypical presentation"
+  },
+  {
+    "id": "O10",
+    "lang": "ha",
+    "level": "orange",
+    "text_en": "Adult male. Blood glucose 1.2 mmol/L. Drowsy, responds only to voice. Diabetic on insulin. HR 102.",
+    "vitals": {
+      "hr": 102,
+      "glucose": 1.2,
+      "avpu": "V"
+    },
+    "flags": [
+      "glucose < 3",
+      "AVPU = V",
+      "severe hypoglycaemia"
+    ],
+    "note": "Severe hypoglycaemia — glucose < 3 and AVPU = V"
+  },
+  {
+    "id": "O11",
+    "lang": "sw",
+    "level": "orange",
+    "text_en": "Adult male. Severe asthma attack. SpO2 88%, RR 34, HR 128. Speaks in single words. Alert.",
+    "vitals": {
+      "spo2": 88,
+      "rr": 34,
+      "hr": 128,
+      "avpu": "A"
+    },
+    "flags": [
+      "SpO2 85-92%",
+      "severe respiratory distress",
+      "asthma"
+    ],
+    "note": "Severe asthma — SpO2 85-92%"
+  },
+  {
+    "id": "O12",
+    "lang": "en",
+    "level": "orange",
+    "text_en": "Adult male. Fever 39.4°C, HR 114, RR 24, BP 92/58. Confused and agitated, responds to voice only. Suspected source lower respiratory tract. Severe sepsis.",
+    "vitals": {
+      "rr": 24, 
+      "hr": 114, 
+      "sbp": 92, 
+      "temp": 39.4, 
+      "avpu": "V"
+    },
+    "flags": [
+      "severe sepsis",
+      "AVPU = V",
+      "hypotension with tachycardia"
+    ],
+    "note": "Severe sepsis — AVPU = V, very urgent discriminator"
+  },
+  {
+    "id": "O13",
+    "lang": "tl",
+    "level": "orange",
+    "text_en": "Child 4 years. SpO2 87%, RR 48, HR 152, temp 39.2°C. Nasal flaring, subcostal recession. Alert.",
+    "vitals": {
+      "spo2": 87,
+      "rr": 48,
+      "hr": 152,
+      "temp": 39.2,
+      "avpu": "A"
+    },
+    "flags": [
+      "SpO2 85-92%",
+      "RR > 40 paediatric",
+      "respiratory distress"
+    ],
+    "note": "Paediatric respiratory distress — SpO2 85-92%"
+  },
+  {
+    "id": "O14",
+    "lang": "bn",
+    "level": "orange",
+    "text_en": "Adult male. Left-sided chest pain with exertion, relieved at rest. Diaphoresis. HR 116, BP 136/82. Alert.",
+    "vitals": {
+      "hr": 116,
+      "sbp": 136,
+      "avpu": "A"
+    },
+    "flags": [
+      "chest pain",
+      "suspected unstable angina",
+      "diaphoresis"
+    ],
+    "note": "Unstable angina — very urgent discriminator"
+  },
+  {
+    "id": "O15",
+    "lang": "ha",
+    "level": "orange",
+    "text_en": "Adult female. Sudden severe abdominal pain. 20 weeks pregnant. HR 118, BP 88/60. Fully alert and talking, AVPU = A. Guarding on palpation. Suspected ectopic rupture.",
+    "vitals": {
+      "hr": 118,
+      "sbp": 88,
+      "avpu": "A"
+    },
+    "flags": [
+      "suspected ectopic rupture",
+      "hypotension with tachycardia",
+      "pregnancy"
+    ],
+    "note": "Suspected ectopic rupture — very urgent, alert patient with haemodynamic instability"
+  },
+  {
+    "id": "O16",
+    "lang": "sw",
+    "level": "orange",
+    "text_en": "Adult male. Temp 40.2°C, HR 122, RR 28, BP 86/54. Responds to voice. Neck stiffness. Photophobia.",
+    "vitals": {
+      "temp": 40.2,
+      "hr": 122,
+      "rr": 28,
+      "sbp": 86,
+      "avpu": "V"
+    },
+    "flags": [
+      "severe sepsis",
+      "AVPU = V",
+      "suspected meningitis"
+    ],
+    "note": "Suspected meningitis with sepsis — AVPU = V"
+  },
+  {
+    "id": "O17",
+    "lang": "en",
+    "level": "orange",
+    "text_en": "Adult male. Crushing central chest pain radiating to back. HR 104, BP 148/92. Diaphoresis. Alert.",
+    "vitals": {
+      "hr": 104,
+      "sbp": 148,
+      "avpu": "A"
+    },
+    "flags": [
+      "chest pain",
+      "suspected aortic dissection",
+      "diaphoresis"
+    ],
+    "note": "Suspected aortic dissection — very urgent discriminator"
+  },
+  {
+    "id": "O18",
+    "lang": "tl",
+    "level": "orange",
+    "text_en": "Child 6 years. SpO2 89%, RR 44, HR 144, temp 38.8°C. Grunting on expiration. Alert but lethargic.",
+    "vitals": {
+      "spo2": 89,
+      "rr": 44,
+      "hr": 144,
+      "temp": 38.8,
+      "avpu": "A"
+    },
+    "flags": [
+      "SpO2 85-92%",
+      "severe paediatric respiratory distress"
+    ],
+    "note": "Severe paediatric pneumonia — SpO2 85-92%"
+  },
+  {
+    "id": "O19",
+    "lang": "bn",
+    "level": "orange",
+    "text_en": "Adult male. Blood glucose 1.6 mmol/L. Sweating, confused, responds to voice. HR 108, RR 20.",
+    "vitals": {
+      "hr": 108,
+      "rr": 20,
+      "glucose": 1.6,
+      "avpu": "V"
+    },
+    "flags": [
+      "glucose < 3",
+      "AVPU = V"
+    ],
+    "note": "Severe hypoglycaemia — glucose < 3 and AVPU = V"
+  },
+  {
+    "id": "O20",
+    "lang": "ha",
+    "level": "orange",
+    "text_en": "Adult female. Right arm weakness and facial droop on waking 3 hours ago. Acute ischaemic stroke, time-critical for thrombolysis. Alert, AVPU = A. BP 172/98.",
+    "vitals": {
+      "sbp": 172,
+      "avpu": "A"
+    },
+    "flags": [
+      "suspected stroke",
+      "arm weakness",
+      "facial droop",
+      "within thrombolysis window"
+    ],
+    "note": "Acute stroke — within thrombolysis window, very urgent discriminator"
+  },
+  {
+    "id": "Y01",
+    "lang": "ha",
+    "level": "yellow",
+    "text_en": "Adult male. Chest pain for 2 hours, dull and non-radiating. Fully alert and talking. HR 88, RR 16, SBP 138. No diaphoresis, no radiation to arm or jaw. Pain 4/10.",
+    "vitals": {
+      "rr": 16,
+      "hr": 94,
+      "sbp": 138,
+      "avpu": "A"
+    },
+    "flags": [
+      "chest pain",
+      "stable vitals"
+    ],
+    "note": "Chest pain with stable vitals — borderline orange/yellow"
+  },
+  {
+    "id": "Y02",
+    "lang": "bn",
+    "level": "yellow",
+    "text_en": "Woman. Vomiting blood twice. Conscious and alert. HR 98, RR 18, SBP 105.",
+    "vitals": {
+      "rr": 18,
+      "hr": 98,
+      "sbp": 105,
+      "avpu": "A"
+    },
+    "flags": [
+      "haematemesis"
+    ],
+    "note": "Haematemesis — urgent discriminator"
+  },
+  {
+    "id": "Y03",
+    "lang": "en",
+    "level": "yellow",
+    "text_en": "Child 4 years. Fever 38.9°C for 2 days. Alert, crying. RR 28, HR 118.",
+    "vitals": {
+      "rr": 28,
+      "hr": 118,
+      "temp": 38.9,
+      "avpu": "A"
+    },
+    "flags": [
+      "fever in child",
+      "tachycardia"
+    ],
+    "note": "Febrile child — urgent discriminator"
+  },
+  {
+    "id": "Y04",
+    "lang": "sw",
+    "level": "yellow",
+    "text_en": "Adult. Head injury from motorbike accident. Brief loss of consciousness lasting under 1 minute, now fully alert and oriented. GCS 14, HR 88, RR 16, SBP 122. No vomiting, no neurological deficit. Stable for urgent assessment.",
+    "vitals": {
+      "hr": 88,
+      "rr": 16,
+      "sbp": 122,
+      "avpu": "A"
+    },
+    "flags": [
+      "head injury",
+      "brief loss of consciousness",
+      "GCS 14"
+    ],
+    "note": "Head injury GCS 14 — urgent discriminator, stable vitals"
+  },
+  {
+    "id": "Y05",
+    "lang": "en",
+    "level": "yellow",
+    "text_en": "Adult male. Moderate chest pain for 3 hours. Alert. HR 94, RR 18, SBP 132. Pain is 6/10.",
+    "vitals": {
+      "hr": 94,
+      "rr": 18,
+      "sbp": 132,
+      "avpu": "A"
+    },
+    "flags": [
+      "chest pain",
+      "tachycardia"
+    ],
+    "note": "Chest pain with stable vitals — urgent discriminator"
+  },
+  {
+    "id": "Y06",
+    "lang": "sw",
+    "level": "yellow",
+    "text_en": "Child 8 years. Fever 39.2°C for 3 days. Alert and playful. RR 24, HR 108. Eating reduced.",
+    "vitals": {
+      "rr": 24,
+      "hr": 108,
+      "temp": 39.2,
+      "avpu": "A"
+    },
+    "flags": [
+      "fever in child",
+      "tachycardia"
+    ],
+    "note": "Febrile child, alert — urgent discriminator"
+  },
+  {
+    "id": "Y07",
+    "lang": "ha",
+    "level": "yellow",
+    "text_en": "Adult female. Moderate lower abdominal pain since yesterday, worsening. Alert. HR 88, RR 18, SBP 118. Tender on palpation with guarding. Requires urgent assessment to exclude appendicitis or pelvic pathology.",
+    "vitals": {
+      "hr": 88,
+      "rr": 18,
+      "sbp": 118,
+      "avpu": "A"
+    },
+    "flags": [
+      "abdominal pain",
+      "moderate pain",
+      "guarding",
+      "worsening"
+    ],
+    "note": "Moderate abdominal pain with stable vitals — urgent discriminator"
+  },
+  {
+    "id": "Y08",
+    "lang": "tl",
+    "level": "yellow",
+    "text_en": "Adult male. Fell from bicycle. Head hit ground. Brief confusion now alert. GCS 14. HR 82, RR 16.",
+    "vitals": {
+      "hr": 82,
+      "rr": 16,
+      "avpu": "A"
+    },
+    "flags": [
+      "head injury",
+      "GCS 14",
+      "brief loss of consciousness"
+    ],
+    "note": "Head injury GCS > 13 — urgent discriminator"
+  },
+  {
+    "id": "Y09",
+    "lang": "bn",
+    "level": "yellow",
+    "text_en": "Woman. Vomiting blood once. Stable. Alert. HR 96, RR 18, SBP 110. Known peptic ulcer.",
+    "vitals": {
+      "hr": 96,
+      "rr": 18,
+      "sbp": 110,
+      "avpu": "A"
+    },
+    "flags": [
+      "haematemesis"
+    ],
+    "note": "Haematemesis, haemodynamically stable — urgent discriminator"
+  },
+  {
+    "id": "Y10",
+    "lang": "en",
+    "level": "yellow",
+    "text_en": "Child 6 years. Fever 38.8°C. Alert, eating and drinking. RR 26, HR 112. Mild cough. No seizures.",
+    "vitals": {
+      "rr": 26,
+      "hr": 112,
+      "temp": 38.8,
+      "avpu": "A"
+    },
+    "flags": [
+      "fever in child"
+    ],
+    "note": "Febrile child, alert — urgent discriminator"
+  },
+  {
+    "id": "Y11",
+    "lang": "sw",
+    "level": "yellow",
+    "text_en": "Adult male. Severe acute back pain after lifting, pain 8/10. Completely unable to walk or stand. Alert. HR 84, RR 16, SBP 126.",
+    "vitals": {
+      "hr": 84,
+      "rr": 16,
+      "sbp": 126,
+      "avpu": "A"
+    },
+    "flags": [
+      "moderate pain",
+      "inability to mobilise"
+    ],
+    "note": "Moderate pain with stable vitals — urgent discriminator"
+  },
+  {
+    "id": "Y12",
+    "lang": "ha",
+    "level": "yellow",
+    "text_en": "Adult male. Fell from standing height. Hit head. Alert. GCS 14. Mild headache. HR 78, RR 16.",
+    "vitals": {
+      "hr": 78,
+      "rr": 16,
+      "avpu": "A"
+    },
+    "flags": [
+      "head injury",
+      "GCS 14"
+    ],
+    "note": "Head injury GCS > 13 — urgent discriminator"
+  },
+  {
+    "id": "Y13",
+    "lang": "tl",
+    "level": "yellow",
+    "text_en": "Child 3 years. Fever 39.5°C for 1 day. Alert, crying. RR 30 (well below paediatric threshold), HR 122. No rash, no neck stiffness. No respiratory distress.",
+    "vitals": {
+      "rr": 30,
+      "hr": 122,
+      "temp": 39.5,
+      "avpu": "A"
+    },
+    "flags": [
+      "fever in child",
+      "tachycardia"
+    ],
+    "note": "Febrile child, alert — RR 30 below urgent threshold, urgent discriminator"
+  },
+  {
+    "id": "Y14",
+    "lang": "bn",
+    "level": "yellow",
+    "text_en": "Adult female. Single episode of vomiting blood. Conscious and talking. HR 102, SBP 108, RR 20.",
+    "vitals": {
+      "hr": 102,
+      "sbp": 108,
+      "rr": 20,
+      "avpu": "A"
+    },
+    "flags": [
+      "haematemesis"
+    ],
+    "note": "Haematemesis, haemodynamically stable — urgent discriminator"
+  },
+  {
+    "id": "Y15",
+    "lang": "en",
+    "level": "yellow",
+    "text_en": "Adult male. Motorcycle accident. Helmet worn. Alert. GCS 14. Confused for 5 minutes. HR 88, RR 18.",
+    "vitals": {
+      "hr": 88,
+      "rr": 18,
+      "avpu": "A"
+    },
+    "flags": [
+      "head injury",
+      "GCS 14",
+      "concussion"
+    ],
+    "note": "Head injury GCS > 13 — urgent discriminator"
+  },
+  {
+    "id": "Y16",
+    "lang": "sw",
+    "level": "yellow",
+    "text_en": "Child 10 years. Fever 39.1°C. Alert and talking. RR 22, HR 106. Complaining of sore throat and ear pain.",
+    "vitals": {
+      "rr": 22,
+      "hr": 106,
+      "temp": 39.1,
+      "avpu": "A"
+    },
+    "flags": [
+      "fever in child"
+    ],
+    "note": "Febrile child, alert — urgent discriminator"
+  },
+  {
+    "id": "Y17",
+    "lang": "ha",
+    "level": "yellow",
+    "text_en": "Adult female. Right-sided chest pain after cough, pleuritic in nature — worse on inspiration, no radiation, no diaphoresis. Alert. HR 86, RR 22, SBP 124.",
+    "vitals": {
+      "hr": 86,
+      "rr": 22,
+      "sbp": 124,
+      "avpu": "A"
+    },
+    "flags": [
+      "chest pain",
+      "pleuritic",
+      "moderate pain"
+    ],
+    "note": "Pleuritic chest pain — not cardiac, stable vitals, urgent discriminator"
+  },
+  {
+    "id": "Y18",
+    "lang": "tl",
+    "level": "yellow",
+    "text_en": "Adult male. Vomited dark blood once. Alert. HR 98, SBP 112, RR 18. Feels weak but stable.",
+    "vitals": {
+      "hr": 98,
+      "sbp": 112,
+      "rr": 18,
+      "avpu": "A"
+    },
+    "flags": [
+      "haematemesis"
+    ],
+    "note": "Haematemesis, haemodynamically stable — urgent discriminator"
+  },
+  {
+    "id": "Y19",
+    "lang": "bn",
+    "level": "yellow",
+    "text_en": "Child 2 years. Fever 38.7°C for 2 days. Alert, irritable. RR 28, HR 116. Drinking well. No seizures.",
+    "vitals": {
+      "rr": 28,
+      "hr": 116,
+      "temp": 38.7,
+      "avpu": "A"
+    },
+    "flags": [
+      "fever in child"
+    ],
+    "note": "Febrile toddler, alert — urgent discriminator"
+  },
+  {
+    "id": "Y20",
+    "lang": "en",
+    "level": "yellow",
+    "text_en": "Adult female. Moderate abdominal pain, 8 weeks pregnant. Alert. HR 92, SBP 118, RR 18. No bleeding.",
+    "vitals": {
+      "hr": 92,
+      "sbp": 118,
+      "rr": 18,
+      "avpu": "A"
+    },
+    "flags": [
+      "abdominal pain",
+      "early pregnancy"
+    ],
+    "note": "Moderate pain in pregnancy with stable vitals — urgent discriminator"
+  },
+  {
+    "id": "G01",
+    "lang": "tl",
+    "level": "green",
+    "text_en": "Minor laceration to left forearm. Patient alert and oriented. HR 80, RR 16, SBP 120.",
+    "vitals": {
+      "rr": 16,
+      "hr": 80,
+      "sbp": 120,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Minor wound — no discriminators, normal TEWS"
+  },
+  {
+    "id": "G02",
+    "lang": "en",
+    "level": "green",
+    "text_en": "Sore throat 3 days. Low-grade fever 37.8°C. Fully alert. Eating and drinking normally.",
+    "vitals": {
+      "rr": 16,
+      "hr": 76,
+      "temp": 37.8,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "URI — normal vitals, no discriminators"
+  },
+  {
+    "id": "G03",
+    "lang": "ha",
+    "level": "green",
+    "text_en": "Routine antenatal visit. 24 weeks pregnant. No complaints. All vitals normal.",
+    "vitals": {
+      "rr": 16,
+      "hr": 74,
+      "sbp": 118,
+      "temp": 36.8,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Routine ANC — no urgency"
+  },
+  {
+    "id": "G04",
+    "lang": "sw",
+    "level": "green",
+    "text_en": "Patient with cough for 6 weeks. No fever, no haemoptysis, no weight loss, no night sweats. Fully alert. Normal vitals.",
+    "vitals": {
+      "rr": 17,
+      "hr": 78,
+      "sbp": 122,
+      "temp": 36.9,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Chronic cough — no red flags for TB, not urgent"
+  },
+  {
+    "id": "G05",
+    "lang": "sw",
+    "level": "green",
+    "text_en": "Adult male. Mild headache for 2 days. Alert. HR 72, RR 14, SBP 118. No fever, no vomiting, no neurological signs.",
+    "vitals": {
+      "hr": 72,
+      "rr": 14,
+      "sbp": 118,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Mild tension headache — no discriminators"
+  },
+  {
+    "id": "G06",
+    "lang": "ha",
+    "level": "green",
+    "text_en": "Adult female. Mild ankle sprain from walking on uneven ground. Alert. Able to weight bear. Normal vitals.",
+    "vitals": {
+      "hr": 74,
+      "rr": 14,
+      "sbp": 116,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Minor musculoskeletal injury — no discriminators"
+  },
+  {
+    "id": "G07",
+    "lang": "tl",
+    "level": "green",
+    "text_en": "Child 5 years. Runny nose and mild cough for 4 days. Alert and playful. No fever. Eating well.",
+    "vitals": {
+      "rr": 20,
+      "hr": 88,
+      "temp": 36.8,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Common cold — no discriminators"
+  },
+  {
+    "id": "G08",
+    "lang": "bn",
+    "level": "green",
+    "text_en": "Adult male. Small superficial burn on right hand from cooking. Alert. Less than 1% body surface area. Normal vitals.",
+    "vitals": {
+      "hr": 76,
+      "rr": 16,
+      "sbp": 122,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Minor burn — no discriminators"
+  },
+  {
+    "id": "G09",
+    "lang": "en",
+    "level": "green",
+    "text_en": "Adult female. Routine follow-up for hypertension medication refill. BP 136/84, well-controlled. Alert. No symptoms. Routine visit only.",
+    "vitals": {
+      "hr": 72,
+      "rr": 14,
+      "sbp": 136,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Routine medication review — well-controlled hypertension, no urgency"
+  },
+  {
+    "id": "G10",
+    "lang": "sw",
+    "level": "green",
+    "text_en": "Child 9 years. Mild earache for 2 days. Alert and playing. No fever. HR 82, RR 18. Eating normally.",
+    "vitals": {
+      "hr": 82,
+      "rr": 18,
+      "temp": 36.9,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Mild otitis — no discriminators"
+  },
+  {
+    "id": "G11",
+    "lang": "ha",
+    "level": "green",
+    "text_en": "Adult male. Mild diarrhoea for 1 day. No blood in stool. Alert. Normal vitals. Drinking fluids.",
+    "vitals": {
+      "hr": 78,
+      "rr": 16,
+      "sbp": 120,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Mild gastroenteritis — hydrated, no discriminators"
+  },
+  {
+    "id": "G12",
+    "lang": "tl",
+    "level": "green",
+    "text_en": "Adult female. Routine postnatal visit at 6 weeks. Fully alert. No complaints. Normal vitals. Breastfeeding well.",
+    "vitals": {
+      "hr": 70,
+      "rr": 14,
+      "sbp": 114,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Routine postnatal visit — no urgency"
+  },
+  {
+    "id": "G13",
+    "lang": "bn",
+    "level": "green",
+    "text_en": "Adult male. Mild lower back pain for 3 days. Alert. Normal vitals. No neurological symptoms. Able to walk.",
+    "vitals": {
+      "hr": 76,
+      "rr": 16,
+      "sbp": 120,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Non-specific low back pain — no discriminators"
+  },
+  {
+    "id": "G14",
+    "lang": "en",
+    "level": "green",
+    "text_en": "Child 7 years. Mild conjunctivitis both eyes. Alert. No fever. No pain. Eating and drinking normally.",
+    "vitals": {
+      "hr": 80,
+      "rr": 18,
+      "temp": 36.7,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Conjunctivitis — no discriminators"
+  },
+  {
+    "id": "G15",
+    "lang": "sw",
+    "level": "green",
+    "text_en": "Adult male. Mild insect bite on left arm. Local redness and swelling. Alert. Normal vitals. No systemic symptoms.",
+    "vitals": {
+      "hr": 74,
+      "rr": 16,
+      "sbp": 118,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Minor insect bite — no discriminators"
+  },
+  {
+    "id": "G16",
+    "lang": "ha",
+    "level": "green",
+    "text_en": "Adult female. Routine immunisation visit. Alert and well. Normal vitals.",
+    "vitals": {
+      "hr": 72,
+      "rr": 14,
+      "sbp": 116,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Routine immunisation — no urgency"
+  },
+  {
+    "id": "G17",
+    "lang": "tl",
+    "level": "green",
+    "text_en": "Adult male. Mild toothache for 2 days. Alert. Normal vitals. No facial swelling. No fever.",
+    "vitals": {
+      "hr": 76,
+      "rr": 16,
+      "sbp": 118,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Dental pain — no discriminators"
+  },
+  {
+    "id": "G18",
+    "lang": "bn",
+    "level": "green",
+    "text_en": "Child 4 years. Mild rash on trunk, no fever, alert and playing. Chickenpox suspected. Eating normally.",
+    "vitals": {
+      "hr": 86,
+      "rr": 20,
+      "temp": 36.8,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Mild viral rash — no discriminators"
+  },
+  {
+    "id": "G19",
+    "lang": "en",
+    "level": "green",
+    "text_en": "Adult female. Mild nausea without vomiting for 1 day. First trimester pregnancy. No bleeding, no pain, no fever. Alert. Normal vitals. Normal first trimester.",
+    "vitals": {
+      "hr": 74,
+      "rr": 14,
+      "sbp": 112,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Morning sickness — no complications, no discriminators"
+  },
+  {
+    "id": "G20",
+    "lang": "sw",
+    "level": "green",
+    "text_en": "Adult male. Mild skin rash on forearm. Alert. No fever. No systemic symptoms. Normal vitals. Contact with plant suspected.",
+    "vitals": {
+      "hr": 72,
+      "rr": 14,
+      "sbp": 118,
+      "avpu": "A"
+    },
+    "flags": [],
+    "note": "Contact dermatitis — no discriminators"
+  },
+  {
+    "id": "B01",
+    "lang": "en",
+    "level": "blue",
+    "text_en": "Patient declared deceased on arrival. No pulse, no breathing, fixed dilated pupils. Rigor mortis present.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "deceased on arrival",
+      "rigor mortis"
+    ],
+    "note": "Deceased — BLUE (expectant/deceased)"
+  },
+  {
+    "id": "B02",
+    "lang": "tl",
+    "level": "blue",
+    "text_en": "Elderly patient. End-stage cancer. Family requests comfort care only. Breathing agonal, unresponsive. Cold extremities, mottled skin. Expected imminent death.",
+    "vitals": {
+      "rr": 4,
+      "hr": 38,
+      "avpu": "U"
+    },
+    "flags": [
+      "agonal breathing",
+      "AVPU = U",
+      "end of life",
+      "cold extremities",
+      "mottled skin"
+    ],
+    "note": "Expectant — end-stage cancer, actively dying, comfort care per family"
+  },
+  {
+    "id": "B03",
+    "lang": "sw",
+    "level": "blue",
+    "text_en": "Burns patient. 95% total body surface area full thickness burns. No survivable prognosis.",
+    "vitals": {
+      "rr": 6,
+      "hr": 42,
+      "avpu": "U"
+    },
+    "flags": [
+      "unsurvivable burns",
+      "AVPU = U"
+    ],
+    "note": "Expectant — burns > 90% TBSA"
+  },
+  {
+    "id": "B04",
+    "lang": "ha",
+    "level": "blue",
+    "text_en": "Mass casualty. Patient with penetrating head injury, fixed dilated pupils, no spontaneous breathing.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "penetrating head injury",
+      "fixed dilated pupils",
+      "no spontaneous breathing"
+    ],
+    "note": "Expectant in mass-casualty — BLUE"
+  },
+  {
+    "id": "B05",
+    "lang": "en",
+    "level": "blue",
+    "text_en": "Adult male. Found at home. No breathing, no pulse. Body cold to touch. Rigor mortis in all limbs.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "deceased on arrival",
+      "rigor mortis",
+      "cold body"
+    ],
+    "note": "Confirmed death — all BLUE criteria met"
+  },
+  {
+    "id": "B06",
+    "lang": "sw",
+    "level": "blue",
+    "text_en": "Adult female. End-stage HIV with wasting. Agonal breathing only. Unresponsive. Cold body, mottled skin. Death expected within minutes. Family declines resuscitation.",
+    "vitals": {
+      "rr": 3,
+      "hr": 28,
+      "avpu": "U"
+    },
+    "flags": [
+      "agonal breathing",
+      "AVPU = U",
+      "end of life",
+      "cold body",
+      "mottled skin",
+      "DNR requested"
+    ],
+    "note": "Expectant — end-stage HIV, actively dying, DNR per family"
+  },
+  {
+    "id": "B07",
+    "lang": "ha",
+    "level": "blue",
+    "text_en": "Adult male. Brought in after road accident. Decapitation injury. No vital signs. Confirmed unsurvivable injuries.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "unsurvivable injury",
+      "no vital signs",
+      "confirmed death"
+    ],
+    "note": "Confirmed death from unsurvivable traumatic injury"
+  },
+  {
+    "id": "B08",
+    "lang": "tl",
+    "level": "blue",
+    "text_en": "Elderly female. Advanced dementia, end of life. No breathing, no pulse. Found by carer. Body cold. Fixed pupils.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "deceased on arrival",
+      "fixed dilated pupils",
+      "cold body"
+    ],
+    "note": "Confirmed death in advanced dementia patient"
+  },
+  {
+    "id": "B09",
+    "lang": "bn",
+    "level": "blue",
+    "text_en": "Adult male. Drowning. Submerged for estimated 45 minutes. No vital signs. Fixed dilated pupils. Cold body.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "deceased on arrival",
+      "prolonged submersion",
+      "fixed dilated pupils"
+    ],
+    "note": "Drowning — prolonged submersion, confirmed unsurvivable"
+  },
+  {
+    "id": "B10",
+    "lang": "en",
+    "level": "blue",
+    "text_en": "Adult female. Terminal cancer. Comfort care only agreed. Agonal breathing. Unresponsive. HR 22, RR 2.",
+    "vitals": {
+      "rr": 2,
+      "hr": 22,
+      "avpu": "U"
+    },
+    "flags": [
+      "agonal breathing",
+      "AVPU = U",
+      "end of life",
+      "comfort care only"
+    ],
+    "note": "Expectant — terminal cancer, comfort care per advance directive"
+  },
+  {
+    "id": "B11",
+    "lang": "sw",
+    "level": "blue",
+    "text_en": "Child 2 years. Found submerged in bucket. No breathing, no pulse. Fixed dilated pupils. Estimated 30 minutes submersion.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "deceased on arrival",
+      "prolonged submersion",
+      "fixed dilated pupils",
+      "cold body"
+    ],
+    "note": "Paediatric drowning — prolonged submersion, confirmed death"
+  },
+  {
+    "id": "B12",
+    "lang": "ha",
+    "level": "blue",
+    "text_en": "Adult male. Burns greater than 90% total body surface area, full thickness. No survivable prognosis even with full resuscitation in any setting. Unresponsive.",
+    "vitals": {
+      "rr": 4,
+      "hr": 28,
+      "avpu": "U"
+    },
+    "flags": [
+      "unsurvivable burns",
+      "AVPU = U",
+      "no survivable prognosis"
+    ],
+    "note": "Expectant — unsurvivable burns, no resuscitation indicated in any setting"
+  },
+  {
+    "id": "B13",
+    "lang": "tl",
+    "level": "blue",
+    "text_en": "Adult female. Mass casualty. Traumatic brain injury with brain matter visible. Fixed pupils. No spontaneous breathing.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "unsurvivable injury",
+      "no vital signs",
+      "fixed dilated pupils"
+    ],
+    "note": "Expectant in mass casualty — unsurvivable traumatic brain injury"
+  },
+  {
+    "id": "B14",
+    "lang": "bn",
+    "level": "blue",
+    "text_en": "Elderly male. Found in bed. No breathing, no pulse. Cold body. Rigor mortis. Family reports ill for weeks.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "deceased on arrival",
+      "rigor mortis",
+      "cold body"
+    ],
+    "note": "Confirmed death at home — all BLUE criteria met"
+  },
+  {
+    "id": "B15",
+    "lang": "en",
+    "level": "blue",
+    "text_en": "Adult male. End-stage renal failure. Dialysis refused. Agonal breathing. Unresponsive. HR 18, RR 3.",
+    "vitals": {
+      "rr": 3,
+      "hr": 18,
+      "avpu": "U"
+    },
+    "flags": [
+      "agonal breathing",
+      "AVPU = U",
+      "end of life"
+    ],
+    "note": "Expectant — end-stage renal failure"
+  },
+  {
+    "id": "B16",
+    "lang": "sw",
+    "level": "blue",
+    "text_en": "Adult male. Explosion injury. Bilateral limb amputations, evisceration. No vital signs.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "unsurvivable injury",
+      "no vital signs"
+    ],
+    "note": "Expectant in mass casualty — unsurvivable blast injuries"
+  },
+  {
+    "id": "B17",
+    "lang": "ha",
+    "level": "blue",
+    "text_en": "Elderly female. Advanced heart failure. DNR agreed. Found unresponsive by family. No breathing, no pulse.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "deceased on arrival",
+      "DNR",
+      "end of life"
+    ],
+    "note": "Confirmed death with existing DNR order"
+  },
+  {
+    "id": "B18",
+    "lang": "tl",
+    "level": "blue",
+    "text_en": "Adult male. Lightning strike. No vital signs on arrival. Fixed dilated pupils. Cold body.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "deceased on arrival",
+      "fixed dilated pupils",
+      "cold body"
+    ],
+    "note": "Confirmed death from lightning strike"
+  },
+  {
+    "id": "B19",
+    "lang": "bn",
+    "level": "blue",
+    "text_en": "Adult female. Terminal liver failure. Jaundiced, comatose. HR 14, RR 2. Family present, no resuscitation.",
+    "vitals": {
+      "rr": 2,
+      "hr": 14,
+      "avpu": "U"
+    },
+    "flags": [
+      "agonal breathing",
+      "AVPU = U",
+      "end of life"
+    ],
+    "note": "Expectant — terminal liver failure"
+  },
+  {
+    "id": "B20",
+    "lang": "en",
+    "level": "blue",
+    "text_en": "Adult male. Mass casualty. Penetrating abdominal trauma with full evisceration. No vital signs.",
+    "vitals": {
+      "rr": 0,
+      "hr": 0,
+      "avpu": "U"
+    },
+    "flags": [
+      "unsurvivable injury",
+      "no vital signs"
+    ],
+    "note": "Expectant in mass casualty — unsurvivable without unavailable surgery"
+  }
+]
