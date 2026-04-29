@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
@@ -14,14 +15,37 @@ class SettingsScreen extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             floating: true,
-            backgroundColor: Colors.white.withOpacity(0.9),
+            backgroundColor: Colors.transparent,
             elevation: 0,
-            title: Text('Settings', style: AppTypography.headlineMedium),
+            flexibleSpace: FlexibleSpaceBar(
+              background: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF0D1B2A).withOpacity(0.8)
+                          : Colors.white.withOpacity(0.75),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withOpacity(0.06)
+                              : Colors.black.withOpacity(0.04),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              titlePadding: const EdgeInsets.only(left: 16, bottom: 12, right: 16),
+              title: Text('Settings', style: AppTypography.headlineMedium),
+            ),
           ),
           SliverPadding(
             padding: const EdgeInsets.all(16),

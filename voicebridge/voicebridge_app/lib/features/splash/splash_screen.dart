@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -116,25 +117,34 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Widget _buildLogo() {
-    return Container(
-      width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [AppColors.secondary, Color(0xFF0E7A88)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.secondary.withOpacity(0.4),
-            blurRadius: 32,
-            spreadRadius: 4,
+    return ClipOval(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          width: 100,
+          height: 100,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [AppColors.secondary, Color(0xFF0E7A88)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.secondary.withOpacity(0.4),
+                blurRadius: 32,
+                spreadRadius: 4,
+              ),
+            ],
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1.5,
+            ),
           ),
-        ],
+          child: const Icon(Icons.mic_rounded, size: 48, color: Colors.white),
+        ),
       ),
-      child: const Icon(Icons.mic_rounded, size: 48, color: Colors.white),
     );
   }
 
@@ -156,35 +166,37 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Widget _buildStatus() {
-    return Column(
-      children: [
-        AnimatedBuilder(
-          animation: _pulseAnimation,
-          builder: (_, __) => Opacity(
-            opacity: _ready ? 1.0 : _pulseAnimation.value,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _ready ? AppColors.triageGreen : AppColors.secondary,
+    return GlassCard(
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (_, __) => Opacity(
+              opacity: _ready ? 1.0 : _pulseAnimation.value,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _ready ? AppColors.triageGreen : AppColors.secondary,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  _statusText,
-                  style: AppTypography.bodySmall.copyWith(
-                    color: Colors.white60,
+                  const SizedBox(width: 10),
+                  Text(
+                    _statusText,
+                    style: AppTypography.bodySmall.copyWith(
+                      color: Colors.white60,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

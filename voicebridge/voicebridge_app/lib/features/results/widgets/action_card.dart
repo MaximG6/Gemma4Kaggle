@@ -16,16 +16,21 @@ class ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.72),
+            color: isDark
+                ? const Color(0xFF1A2B3C).withOpacity(0.85)
+                : Colors.white.withOpacity(0.72),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: Colors.white.withOpacity(0.5),
+              color: isDark
+                  ? Colors.white.withOpacity(0.12)
+                  : Colors.white.withOpacity(0.5),
               width: 1.0,
             ),
           ),
@@ -53,13 +58,13 @@ class ActionCard extends StatelessWidget {
                             Icon(
                               Icons.medical_services_rounded,
                               size: 16,
-                              color: AppColors.textSecondary,
+                              color: isDark ? Colors.white70 : AppColors.textSecondary,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               'RECOMMENDED ACTION',
                               style: AppTypography.labelLarge.copyWith(
-                                color: AppColors.textSecondary,
+                                color: isDark ? Colors.white70 : AppColors.textSecondary,
                                 letterSpacing: 0.8,
                               ),
                             ),

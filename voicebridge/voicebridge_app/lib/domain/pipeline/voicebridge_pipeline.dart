@@ -76,5 +76,15 @@ abstract class VoicebridgePipeline {
     void Function(PipelineStatus)? onStatusChange,
   });
 
+  Future<TriageOutput> runTextPipeline(
+    String text, {
+    void Function(PipelineStatus)? onStatusChange,
+  });
+
+  Future<Map<String, dynamic>> runInteractiveTurn(
+    String text, {
+    String? sessionId,
+  });
+
   void dispose();
 }

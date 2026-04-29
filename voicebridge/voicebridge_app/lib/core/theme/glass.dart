@@ -8,40 +8,50 @@ class GlassCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(20),
-    this.darkMode = false,
     this.borderRadius = 20,
     this.margin,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
-  final bool darkMode;
   final double borderRadius;
   final EdgeInsetsGeometry? margin;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: margin,
       decoration: BoxDecoration(
-        color: darkMode ? AppColors.surfaceGlassDark : AppColors.surfaceGlass,
+        color: isDark
+            ? const Color(0xFF1A2B3C).withOpacity(0.6)
+            : Colors.white.withOpacity(0.72),
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: Colors.white.withOpacity(darkMode ? 0.12 : 0.5),
+          color: isDark
+              ? Colors.white.withOpacity(0.15)
+              : Colors.white.withOpacity(0.6),
           width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.06),
             blurRadius: 20,
             offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: isDark
+                ? Colors.transparent
+                : Colors.white.withOpacity(0.5),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: Padding(
             padding: padding,
             child: child,
@@ -216,14 +226,12 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     this.leading,
     this.actions,
-    this.darkMode = false,
     this.subtitle,
   });
 
   final String title;
   final Widget? leading;
   final List<Widget>? actions;
-  final bool darkMode;
   final String? subtitle;
 
   @override
@@ -231,6 +239,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -242,12 +251,14 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
             right: 16,
           ),
           decoration: BoxDecoration(
-            color: darkMode
-                ? AppColors.surfaceGlassDark
+            color: isDark
+                ? const Color(0xFF0D1B2A).withOpacity(0.9)
                 : Colors.white.withOpacity(0.85),
             border: Border(
               bottom: BorderSide(
-                color: Colors.white.withOpacity(darkMode ? 0.1 : 0.4),
+                color: isDark
+                    ? Colors.white.withOpacity(0.1)
+                    : Colors.white.withOpacity(0.4),
                 width: 1,
               ),
             ),
@@ -267,14 +278,14 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
                     Text(
                       title,
                       style: AppTypography.headlineMedium.copyWith(
-                        color: darkMode ? Colors.white : AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     if (subtitle != null)
                       Text(
                         subtitle!,
                         style: AppTypography.bodySmall.copyWith(
-                          color: darkMode
+                          color: isDark
                               ? Colors.white60
                               : AppColors.textSecondary,
                         ),

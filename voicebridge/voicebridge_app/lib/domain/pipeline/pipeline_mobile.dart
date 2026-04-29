@@ -24,5 +24,34 @@ class MobilePipeline implements VoicebridgePipeline {
   }
 
   @override
+  Future<TriageOutput> runTextPipeline(
+    String text, {
+    void Function(PipelineStatus)? onStatusChange,
+  }) async {
+    onStatusChange?.call(PipelineStatus.triaging);
+    await Future.delayed(const Duration(seconds: 3));
+
+    onStatusChange?.call(PipelineStatus.generatingReport);
+    await Future.delayed(const Duration(seconds: 1));
+
+    onStatusChange?.call(PipelineStatus.done);
+    return TriageOutput.mock();
+  }
+
+  @override
+  Future<Map<String, dynamic>> runInteractiveTurn(
+    String text, {
+    String? sessionId,
+  }) async {
+    await Future.delayed(const Duration(seconds: 2));
+    return {
+      'session_id': sessionId ?? 'mock-session',
+      'response': 'What is the patient\'s current heart rate and blood pressure?',
+      'is_final': false,
+      'triage': null,
+    };
+  }
+
+  @override
   void dispose() {}
 }

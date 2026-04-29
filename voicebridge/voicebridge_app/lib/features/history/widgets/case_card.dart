@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/colors.dart';
@@ -25,14 +26,20 @@ class CaseCard extends StatelessWidget {
       key: Key(record.id),
       direction: DismissDirection.endToStart,
       onDismissed: (_) => onDelete(),
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        decoration: BoxDecoration(
-          color: AppColors.triageRed.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(20),
+      background: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            decoration: BoxDecoration(
+              color: AppColors.triageRed.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(Icons.delete_outline, color: AppColors.triageRed),
+          ),
         ),
-        child: const Icon(Icons.delete_outline, color: AppColors.triageRed),
       ),
       child: GestureDetector(
         onTap: () => context.go('/case/${record.id}'),

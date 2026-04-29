@@ -11,6 +11,7 @@ import 'features/processing/processing_screen.dart';
 import 'features/results/results_screen.dart';
 import 'features/history/history_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'features/interactive/interactive_screen.dart';
 import 'providers/settings_provider.dart';
 
 final _router = GoRouter(
@@ -40,6 +41,7 @@ final _router = GoRouter(
       ],
     ),
     GoRoute(path: '/record', builder: (_, __) => const RecordingScreen()),
+    GoRoute(path: '/interactive', builder: (_, __) => const InteractiveScreen()),
     GoRoute(path: '/processing', builder: (_, __) => const ProcessingScreen()),
     GoRoute(
       path: '/results/:id',

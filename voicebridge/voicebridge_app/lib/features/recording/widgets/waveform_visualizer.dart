@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/theme/colors.dart';
 
@@ -42,18 +43,40 @@ class _WaveformVisualizerState extends State<WaveformVisualizer>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _breathAnimation,
-      builder: (_, __) {
-        return CustomPaint(
-          painter: _WaveformPainter(
-            amplitudes: widget.amplitudes,
-            isRecording: widget.isRecording,
-            breathValue: _breathAnimation.value,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withOpacity(0.04)
+                : Colors.white.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withOpacity(0.08)
+                  : Colors.white.withOpacity(0.4),
+              width: 1.0,
+            ),
           ),
-          child: const SizedBox.expand(),
-        );
-      },
+          child: AnimatedBuilder(
+            animation: _breathAnimation,
+            builder: (_, __) {
+              return CustomPaint(
+                painter: _WaveformPainter(
+                  amplitudes: widget.amplitudes,
+                  isRecording: widget.isRecording,
+                  breathValue: _breathAnimation.value,
+                  isDark: isDark,
+                ),
+                child: const SizedBox.expand(),
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 }
@@ -63,11 +86,13 @@ class _WaveformPainter extends CustomPainter {
     required this.amplitudes,
     required this.isRecording,
     required this.breathValue,
+    required this.isDark,
   });
 
   final List<double> amplitudes;
   final bool isRecording;
   final double breathValue;
+  final bool isDark;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -100,7 +125,7 @@ class _WaveformPainter extends CustomPainter {
 
       paint.color = isRecording
           ? AppColors.secondary.withOpacity(opacity)
-          : Colors.white.withOpacity(opacity);
+          : (isDark ? Colors.white : Colors.black38).withOpacity(opacity);
 
       canvas.drawLine(
         Offset(x, centerY - barHeight / 2),
@@ -114,5 +139,6 @@ class _WaveformPainter extends CustomPainter {
   bool shouldRepaint(_WaveformPainter old) =>
       old.amplitudes != amplitudes ||
       old.isRecording != isRecording ||
-      old.breathValue != breathValue;
+      old.breathValue != breathValue ||
+      old.isDark != isDark;
 }

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/colors.dart';
@@ -19,7 +20,7 @@ class _QuickActionCardState extends State<QuickActionCard>
     super.initState();
     _gradientController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
+      duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
   }
 
@@ -34,35 +35,43 @@ class _QuickActionCardState extends State<QuickActionCard>
     return AnimatedBuilder(
       animation: _gradientController,
       builder: (_, __) {
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: const [
-                Color(0xFF0D2137),
-                AppColors.secondary,
-                Color(0xFF0E4A55),
-              ],
-              begin: Alignment.lerp(
-                Alignment.topLeft,
-                Alignment.topRight,
-                _gradientController.value,
-              )!,
-              end: Alignment.lerp(
-                Alignment.bottomRight,
-                Alignment.bottomLeft,
-                _gradientController.value,
-              )!,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.secondary.withOpacity(0.25),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: const [
+                    Color(0xFF0D2137),
+                    AppColors.secondary,
+                    Color(0xFF0E4A55),
+                  ],
+                  begin: Alignment.lerp(
+                    Alignment.topLeft,
+                    Alignment.topRight,
+                    _gradientController.value,
+                  )!,
+                  end: Alignment.lerp(
+                    Alignment.bottomRight,
+                    Alignment.bottomLeft,
+                    _gradientController.value,
+                  )!,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.18),
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.secondary.withOpacity(0.25),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-            ],
-          ),
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,6 +133,8 @@ class _QuickActionCardState extends State<QuickActionCard>
                 ],
               ),
             ],
+          ),
+            ),
           ),
         );
       },

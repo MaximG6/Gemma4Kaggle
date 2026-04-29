@@ -101,7 +101,6 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
           ),
           const SizedBox(height: 40),
           GlassCard(
-            darkMode: true,
             child: PipelineProgressStepper(
               currentStatus: state.status,
               elapsed: _elapsed,
@@ -109,11 +108,18 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
           ),
           const SizedBox(height: 24),
           GlassCard(
-            darkMode: true,
             child: Row(
               children: [
-                const Icon(Icons.audio_file_rounded,
-                    color: Colors.white54, size: 20),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.audio_file_rounded,
+                      color: Colors.white54, size: 18),
+                ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,7 +149,6 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: GlassCard(
-          darkMode: true,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

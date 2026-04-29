@@ -41,6 +41,25 @@ class VoicebridgeApi {
     return TriageOutput.fromJson(json['triage'] as Map<String, dynamic>);
   }
 
+  Future<TriageOutput> postText(String text) async {
+    final res = await http
+        .post(
+          Uri.parse('$_baseUrl/intake/text'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'text': text}),
+        )
+        .timeout(const Duration(seconds: 60));
+
+    if (res.statusCode != 200) {
+      throw ApiException(
+        'Text intake failed: ${res.statusCode} ${res.body}',
+      );
+    }
+
+    final json = jsonDecode(res.body) as Map<String, dynamic>;
+    return TriageOutput.fromJson(json['triage'] as Map<String, dynamic>);
+  }
+
   Future<AppRecord?> getRecord(String id) async {
     final res = await http
         .get(Uri.parse('$_baseUrl/records/$id'))
@@ -60,6 +79,30 @@ class VoicebridgeApi {
       output: TriageOutput.fromJson(json),
       createdAt: DateTime.now(),
     );
+  }
+
+  Future<Map<String, dynamic>> postInteractive(
+    String text, {
+    String? sessionId,
+  }) async {
+    final body = <String, dynamic>{'text': text};
+    if (sessionId != null) body['session_id'] = sessionId;
+
+    final res = await http
+        .post(
+          Uri.parse('$_baseUrl/intake/interactive'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 90));
+
+    if (res.statusCode != 200) {
+      throw ApiException(
+        'Interactive intake failed: ${res.statusCode} ${res.body}',
+      );
+    }
+
+    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   Future<List<AppRecord>> getRecords({int limit = 50}) async {

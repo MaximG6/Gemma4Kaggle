@@ -81,6 +81,77 @@ class PipelineNotifier extends AsyncNotifier<PipelineState> {
     }
   }
 
+  Future<void> runTextPipeline(String text) async {
+    state = AsyncData(
+      state.valueOrNull?.copyWith(
+            status: PipelineStatus.triaging,
+            error: null,
+          ) ??
+          const PipelineState(status: PipelineStatus.triaging),
+    );
+
+    final start = DateTime.now();
+
+    try {
+      final result = await _pipeline.runTextPipeline(
+        text,
+        onStatusChange: (s) {
+          state = AsyncData(
+            state.valueOrNull?.copyWith(
+                  status: s,
+                  elapsed: DateTime.now().difference(start),
+                ) ??
+                PipelineState(status: s),
+          );
+        },
+      );
+
+      state = AsyncData(
+        PipelineState(
+          status: PipelineStatus.done,
+          result: result,
+          elapsed: DateTime.now().difference(start),
+        ),
+      );
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
+
+  Future<Map<String, dynamic>> runInteractivePipeline(
+    String text, {
+    String? sessionId,
+  }) async {
+    state = AsyncData(
+      state.valueOrNull?.copyWith(
+            status: PipelineStatus.triaging,
+            error: null,
+          ) ??
+          const PipelineState(status: PipelineStatus.triaging),
+    );
+
+    try {
+      final result = await _pipeline.runInteractiveTurn(
+        text,
+        sessionId: sessionId,
+      );
+      state = const AsyncData(PipelineState());
+      return result;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
+  }
+
+  void setInteractiveResult(TriageOutput result) {
+    state = AsyncData(
+      PipelineState(
+        status: PipelineStatus.done,
+        result: result,
+      ),
+    );
+  }
+
   void reset() {
     state = const AsyncData(PipelineState());
   }

@@ -28,5 +28,28 @@ class WebPipeline implements VoicebridgePipeline {
   }
 
   @override
+  Future<TriageOutput> runTextPipeline(
+    String text, {
+    void Function(PipelineStatus)? onStatusChange,
+  }) async {
+    onStatusChange?.call(PipelineStatus.triaging);
+    final output = await _api.postText(text);
+
+    onStatusChange?.call(PipelineStatus.generatingReport);
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    onStatusChange?.call(PipelineStatus.done);
+    return output;
+  }
+
+  @override
+  Future<Map<String, dynamic>> runInteractiveTurn(
+    String text, {
+    String? sessionId,
+  }) async {
+    return _api.postInteractive(text, sessionId: sessionId);
+  }
+
+  @override
   void dispose() {}
 }
