@@ -1,0 +1,14 @@
+Download real font files before building:
+
+Inter (OFL license):
+  https://fonts.google.com/specimen/Inter
+  Files needed: Inter-Regular.ttf, Inter-Medium.ttf, Inter-SemiBold.ttf, Inter-Bold.ttf
+  Place in: assets/fonts/Inter/
+
+JetBrains Mono (OFL license):
+  https://www.jetbrains.com/lp/mono/
+  Files needed: JetBrainsMono-Regular.ttf
+  Place in: assets/fonts/JetBrainsMono/
+
+The placeholder .ttf files in this directory are stubs and will cause
+a render error. Replace them with the real files from the links above.

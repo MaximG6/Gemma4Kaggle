@@ -14,6 +14,18 @@ The entire stack runs on an $80 Raspberry Pi 5 or any Android tablet. The server
 
 ---
 
+## Benchmark Results
+
+100-case benchmark (20 per SATS level, 5 languages) — real llama-cli GGUF inference on RTX 5090:
+
+| Metric | Base Gemma 4 E4B | Fine-tuned VoiceBridge | Delta |
+|--------|:----------------:|:----------------------:|------:|
+| Exact match accuracy | 74% | **89%** | +15pp |
+| Safe escalation rate | 89% | **98%** | +9pp |
+| Unsafe under-triage cases | 11 | **2** | -9 |
+
+Per-level accuracy (tuned): RED 100%, ORANGE 85%, YELLOW 90%, GREEN 90%, BLUE 80%.
+
 ## Key Numbers
 
 - Prize pool: $200,000 across general, impact, and technical categories

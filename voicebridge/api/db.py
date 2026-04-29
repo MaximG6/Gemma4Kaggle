@@ -79,7 +79,7 @@ def save_record(record_id: str, triage_json: dict) -> None:
 
 
 def list_records(limit: int = 50) -> list[dict]:
-    """Return the most recent triage records as plain dicts."""
+    """Return the most recent triage records in AppRecord wire format."""
     with SessionLocal() as session:
         rows = (
             session.query(TriageRecord)
@@ -87,7 +87,15 @@ def list_records(limit: int = 50) -> list[dict]:
             .limit(limit)
             .all()
         )
-        return [json.loads(r.full_json) for r in rows]
+        return [
+            {
+                "id": r.record_id,
+                "output_json": r.full_json,
+                "created_at": r.created_at.isoformat(),
+                "audio_file_path": None,
+            }
+            for r in rows
+        ]
 
 
 def get_record(record_id: str) -> dict | None:

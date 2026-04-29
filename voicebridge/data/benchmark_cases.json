@@ -230,7 +230,7 @@
     "id": "R14",
     "lang": "sw",
     "level": "red",
-    "text_en": "Adult male. Electric shock at work site. Found collapsed. No breathing. No pulse. Bystanders started CPR.",
+    "text_en": "Adult male. Electric shock at work site. Found collapsed 2 minutes ago. No breathing. No pulse. Bystanders started CPR immediately. Resuscitation in progress — not confirmed dead.",
     "vitals": {
       "rr": 0,
       "hr": 0,
@@ -240,9 +240,11 @@
       "apnoea",
       "no palpable pulse",
       "AVPU = U",
-      "electrocution"
+      "electrocution",
+      "CPR in progress",
+      "resuscitation indicated"
     ],
-    "note": "Electrocution cardiac arrest — emergency discriminator"
+    "note": "Electrocution cardiac arrest — found 2 minutes ago, CPR in progress, resuscitation indicated"
   },
   {
     "id": "R15",

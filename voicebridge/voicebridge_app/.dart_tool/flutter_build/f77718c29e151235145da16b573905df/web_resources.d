@@ -1,0 +1,1 @@
+ build\\web\\manifest.json:  C:\\Users\\Maxim\\.openclaw\\workspace\\Gemma4Kaggle\\voicebridge\\voicebridge_app\\web\\index.html C:\\Users\\Maxim\\.openclaw\\workspace\\Gemma4Kaggle\\voicebridge\\voicebridge_app\\web\\manifest.json

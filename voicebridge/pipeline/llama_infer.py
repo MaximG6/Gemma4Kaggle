@@ -10,7 +10,7 @@ from typing import Optional
 LLAMA_CLI      = str(Path.home() / "llama.cpp" / "build" / "bin" / "llama-cli")
 FINE_GGUF      = os.environ.get("FINE_GGUF", str(Path.home() / "voicebridge-finetuned-q4km.gguf"))
 GPU_LAYERS     = 99
-THREADS        = 4
+THREADS        = 2
 TEMP           = 0.1
 REPEAT_PENALTY = 1.3
 MAX_TOKENS     = 1024
@@ -63,33 +63,32 @@ def run_inference(
     _mt   = max_tokens     if max_tokens     is not None else MAX_TOKENS
 
     prompt   = build_prompt(text, lang, system_prompt)
-    tmp_path = Path(f"/tmp/vb_{os.getpid()}_{int(time.time()*1000)}.typescript")
 
     t0 = time.time()
     try:
-        cmd_str = " ".join(shlex.quote(c) for c in [
+        cmd = [
             LLAMA_CLI, "-m", model_path, "-p", prompt,
             "-n", str(_mt), "--threads", str(THREADS),
             "--temp", str(_temp), "--repeat-penalty", str(_rp),
             "-ngl", str(GPU_LAYERS), "--single-turn", "--log-disable",
-        ])
-        subprocess.run(
-            ["script", "-q", "-c", cmd_str, str(tmp_path)],
+        ]
+        env = os.environ.copy()
+        env["CUDA_VISIBLE_DEVICES"] = "1"
+        result = subprocess.run(
+            cmd,
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
             timeout=120, check=False,
+            env=env,
         )
+        raw_full = result.stdout
     except subprocess.TimeoutExpired:
-        tmp_path.unlink(missing_ok=True)
         return None, 120.0, "[TIMEOUT]"
     except Exception as exc:
-        tmp_path.unlink(missing_ok=True)
         return None, 0.0, f"[ERROR: {exc}]"
 
-    latency  = time.time() - t0
-    raw_full = tmp_path.read_text(errors="replace").strip() if tmp_path.exists() else ""
-    tmp_path.unlink(missing_ok=True)
+    latency = time.time() - t0
 
     raw_full = re.sub(r'\x1b\[[0-9;]*[mGKHFABCDJKlh]', '', raw_full)
     raw_full = re.sub(r'\x1b[()][AB012]',               '', raw_full)

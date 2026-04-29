@@ -104,26 +104,20 @@ class TriageOutput(BaseModel):
 # ---------------------------------------------------------------------------
 
 _SYSTEM_PROMPT = """\
-You are a clinical triage assistant trained on SATS 2023 and WHO ETAT guidelines.
+You are a clinical triage assistant. Respond with key-value pairs only.
+Format:
+TriageLevel: red/orange/yellow/green/blue
+PrimaryComplaint: one sentence
+ReportedSymptoms: symptom1, symptom2
+VitalSignsReported: key: value, key: value
+DurationOfSymptoms: free text
+RelevantHistory: free text
+RedFlagIndicators: indicator1, indicator2
+RecommendedAction: what to do
+ReferralNeeded: yes/no
+ConfidenceScore: 0.0-1.0
 
-SATS RED criteria (any one → RED):
-  • Airway: completely obstructed
-  • Respiratory rate < 10 or > 29 per minute
-  • SpO2 < 90% on room air
-  • Heart rate < 40 or > 150 bpm
-  • GCS < 9
-  • AVPU = P (responds to Pain) or U (Unresponsive)
-  • Major uncontrolled haemorrhage
-  • Active seizure / convulsions
-  • Temperature > 41 °C
-  • Blood glucose < 3 mmol/L with altered consciousness
-
-Be conservative: when uncertain, escalate urgency rather than downgrade.
-Do NOT add commentary. Respond ONLY with a single valid JSON object matching:
-
-{schema}
-
-Nurse intake transcript:
+Nurse intake:
 {transcript}"""
 
 
@@ -155,14 +149,83 @@ class TriageClassifier:
         """
         schema = json.dumps(TriageOutput.model_json_schema(), indent=2)
         prompt = _SYSTEM_PROMPT.format(schema=schema, transcript=transcript)
-        raw = self._tx._generate_text(prompt, max_tokens=1024)
+        raw = self._tx._generate_text(prompt, max_tokens=512)
 
+        # Try JSON first
         start = raw.find("{")
         end = raw.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            raise ValueError(f"No JSON object in triage model output: {raw!r}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                data = json.loads(raw[start : end + 1])
+                data["source_language"] = source_lang
+                data["raw_transcript"] = transcript
+                return TriageOutput(**data)
+            except (json.JSONDecodeError, Exception):
+                pass  # Fall through to key-value parsing
 
-        data = json.loads(raw[start : end + 1])
-        data["source_language"] = source_lang
-        data["raw_transcript"] = transcript
-        return TriageOutput(**data)
+        # Parse key-value format (fine-tuned model output)
+        data = {}
+        for line in raw.strip().split("\n"):
+            if ":" in line:
+                key, _, value = line.partition(":")
+                key = key.strip().lower().replace(" ", "_")
+                value = value.strip()
+                data[key] = value
+
+        # Map to TriageOutput fields
+        mapping = {
+            "triagelevel": "triage_level",
+            "primarycomplaint": "primary_complaint",
+            "reported_symptoms": "reported_symptoms",
+            "vitalsignsreported": "vital_signs_reported",
+            "durationofsymptoms": "duration_of_symptoms",
+            "relevant_history": "relevant_history",
+            "redflagindicators": "red_flag_indicators",
+            "recommendedaction": "recommended_action",
+            "referralneeded": "referral_needed",
+            "confidencescore": "confidence_score",
+        }
+
+        parsed = {}
+        for kv_key, field in mapping.items():
+            if kv_key in data:
+                val = data[kv_key]
+                if field == "triage_level":
+                    parsed[field] = val.lower()
+                elif field == "reported_symptoms":
+                    parsed[field] = [s.strip() for s in val.split(",") if s.strip()] if val else []
+                elif field == "vital_signs_reported":
+                    parsed[field] = {k.strip(): v.strip() for k, v in [x.split(":", 1) for x in val.split(",") if ":" in x]} if val else {}
+                elif field == "red_flag_indicators":
+                    parsed[field] = [s.strip() for s in val.split(",") if s.strip()] if val else []
+                elif field == "referral_needed":
+                    parsed[field] = val.lower() in ("yes", "true", "1")
+                elif field == "confidence_score":
+                    try:
+                        parsed[field] = float(val)
+                    except ValueError:
+                        parsed[field] = 0.5
+                else:
+                    parsed[field] = val
+
+        parsed["source_language"] = source_lang
+        parsed["raw_transcript"] = transcript
+        
+        # Add defaults for missing fields
+        defaults = {
+            "triage_level": "green",
+            "primary_complaint": "Not specified",
+            "relevant_history": "None reported",
+            "red_flag_indicators": [],
+            "recommended_action": "Monitor and reassess",
+            "referral_needed": False,
+            "confidence_score": 0.5,
+            "reported_symptoms": [],
+            "vital_signs_reported": {},
+            "duration_of_symptoms": "Unknown",
+        }
+        for field, default in defaults.items():
+            if field not in parsed:
+                parsed[field] = default
+        
+        return TriageOutput(**parsed)
