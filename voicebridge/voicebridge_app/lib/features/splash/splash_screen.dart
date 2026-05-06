@@ -119,7 +119,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Widget _buildLogo() {
     return ClipOval(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: Container(
           width: 100,
           height: 100,

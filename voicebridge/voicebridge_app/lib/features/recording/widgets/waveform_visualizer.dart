@@ -47,7 +47,7 @@ class _WaveformVisualizerState extends State<WaveformVisualizer>
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
         child: Container(
           decoration: BoxDecoration(
             color: isDark
@@ -123,9 +123,15 @@ class _WaveformPainter extends CustomPainter {
           ? 0.6 + 0.4 * amp
           : 0.3 + 0.3 * breathValue;
 
-      paint.color = isRecording
-          ? AppColors.secondary.withOpacity(opacity)
-          : (isDark ? Colors.white : Colors.black38).withOpacity(opacity);
+      // Gradient color based on amplitude - teal to purple to pink
+      Color barColor;
+      if (isRecording) {
+        final hue = 174 + (amp * 120); // teal(174) → magenta(294)
+        barColor = HSLColor.fromAHSL(opacity, hue, 0.7, 0.6).toColor();
+      } else {
+        barColor = isDark ? Colors.white.withOpacity(opacity * 0.5) : AppColors.textSecondary.withOpacity(opacity);
+      }
+      paint.color = barColor;
 
       canvas.drawLine(
         Offset(x, centerY - barHeight / 2),

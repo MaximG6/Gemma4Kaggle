@@ -42,7 +42,13 @@ final _router = GoRouter(
     ),
     GoRoute(path: '/record', builder: (_, __) => const RecordingScreen()),
     GoRoute(path: '/interactive', builder: (_, __) => const InteractiveScreen()),
-    GoRoute(path: '/processing', builder: (_, __) => const ProcessingScreen()),
+    GoRoute(
+      path: '/processing',
+      builder: (_, state) {
+        final mode = state.uri.queryParameters['mode'] ?? 'audio';
+        return ProcessingScreen(inputMode: mode);
+      },
+    ),
     GoRoute(
       path: '/results/:id',
       builder: (_, state) =>
@@ -79,16 +85,24 @@ class _Shell extends StatefulWidget {
 }
 
 class _ShellState extends State<_Shell> {
-  int _index = 0;
-
   static const _destinations = [
     ('/home', Icons.home_outlined, Icons.home_rounded, 'Home'),
     ('/history', Icons.history_outlined, Icons.history_rounded, 'History'),
     ('/settings', Icons.settings_outlined, Icons.settings_rounded, 'Settings'),
   ];
 
+  int _getIndex(String path) {
+    for (var i = 0; i < _destinations.length; i++) {
+      if (path.startsWith(_destinations[i].$1)) return i;
+    }
+    return 0;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final path = GoRouterState.of(context).uri.path;
+    final index = _getIndex(path);
+
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Container(
@@ -104,9 +118,8 @@ class _ShellState extends State<_Shell> {
         ),
         child: SafeArea(
           child: NavigationBar(
-            selectedIndex: _index,
+            selectedIndex: index,
             onDestinationSelected: (i) {
-              setState(() => _index = i);
               context.go(_destinations[i].$1);
             },
             backgroundColor: Colors.transparent,

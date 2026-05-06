@@ -12,6 +12,7 @@ class TriageOutput {
     required this.confidenceScore,
     required this.sourceLanguage,
     required this.rawTranscript,
+    this.rawThinking,
   });
 
   final String triageLevel;
@@ -26,6 +27,7 @@ class TriageOutput {
   final double confidenceScore;
   final String sourceLanguage;
   final String rawTranscript;
+  final String? rawThinking;
 
   factory TriageOutput.fromJson(Map<String, dynamic> json) {
     return TriageOutput(
@@ -52,6 +54,7 @@ class TriageOutput {
           (json['confidence_score'] as num?)?.toDouble() ?? 0.0,
       sourceLanguage: json['source_language'] as String? ?? 'en',
       rawTranscript: json['raw_transcript'] as String? ?? '',
+      rawThinking: json['thinking'] as String? ?? json['raw_thinking'] as String?,
     );
   }
 
@@ -69,6 +72,7 @@ class TriageOutput {
       'confidence_score': confidenceScore,
       'source_language': sourceLanguage,
       'raw_transcript': rawTranscript,
+      if (rawThinking != null) 'thinking': rawThinking,
     };
   }
 
@@ -102,6 +106,14 @@ class TriageOutput {
       sourceLanguage: 'en',
       rawTranscript:
           'Patient reports chest pain for the last two hours with shortness of breath and sweating...',
+      rawThinking:
+          'The patient presents with chest pain (2h), dyspnoea, diaphoresis, and nausea.\n'
+          'HR 110 bpm — tachycardia. BP 95/60 — borderline hypotensive. SpO2 94% — mild hypoxia.\n'
+          'RR 22/min — tachypnoeic.\n\n'
+          'Red flag screen: chest pain + diaphoresis → high-risk ACS feature. Radiation to left arm confirmed.\n'
+          'BP 95/60 meets threshold for haemodynamic compromise.\n\n'
+          'SATS decision: immediate threat to life → ORANGE (Emergency). Needs IV access, ECG, and\n'
+          'urgent cardiology review within 10 minutes. Referral YES. Confidence 0.91.',
     );
   }
 }

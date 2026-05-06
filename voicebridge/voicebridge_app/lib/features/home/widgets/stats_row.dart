@@ -45,13 +45,6 @@ class StatsRow extends StatelessWidget {
             icon: Icons.timer_outlined,
             color: AppColors.triageGreen,
           ),
-          const SizedBox(width: 12),
-          _StatCard(
-            label: 'Accuracy',
-            value: '95%',
-            icon: Icons.check_circle_outline,
-            color: AppColors.triageBlue,
-          ),
         ],
       ),
     );
@@ -75,17 +68,29 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      accentColor: color,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
+              gradient: LinearGradient(
+                colors: [color, color.withOpacity(0.6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: Icon(icon, color: color, size: 18),
+            child: Icon(icon, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           Column(
@@ -96,6 +101,7 @@ class _StatCard extends StatelessWidget {
                   style: AppTypography.headlineSmall.copyWith(
                     fontWeight: FontWeight.w700,
                     fontSize: 18,
+                    color: color,
                   )),
               Text(label, style: AppTypography.bodySmall),
             ],

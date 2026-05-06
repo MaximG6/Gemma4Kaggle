@@ -29,7 +29,7 @@ class CaseCard extends StatelessWidget {
       background: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
           child: Container(
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 20),
@@ -45,13 +45,18 @@ class CaseCard extends StatelessWidget {
         onTap: () => context.go('/case/${record.id}'),
         child: GlassCard(
           padding: EdgeInsets.zero,
+          accentColor: level.color,
           child: Row(
             children: [
               Container(
-                width: 5,
+                width: 6,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: level.color,
+                  gradient: LinearGradient(
+                    colors: [level.color, level.color.withOpacity(0.5)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),
                     bottomLeft: Radius.circular(20),

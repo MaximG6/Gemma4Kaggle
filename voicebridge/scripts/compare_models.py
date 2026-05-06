@@ -1,7 +1,7 @@
 """
 VoiceBridge Model Comparison — Real GGUF Inference (GPU)
 =========================================================
-Runs the full 20-case benchmark suite against two real GGUF models:
+Runs the full benchmark suite against two real GGUF models:
   1. Base  — Gemma 4 E4B Q4_K_M (unsloth/gemma-4-E4B-it-GGUF)
   2. Tuned — VoiceBridge fine-tuned Q4_K_M (voicebridge-finetuned-q4km.gguf)
 
@@ -65,7 +65,18 @@ def _find_base_gguf() -> str:
 
 
 BASE_GGUF = os.environ.get("BASE_GGUF", _find_base_gguf())
-FINE_GGUF = os.environ.get("FINE_GGUF", str(_HOME / "voicebridge-finetuned-q4km.gguf"))
+_FINE_CANDIDATES = [
+    _REPO_ROOT / "models" / "voicebridge-finetuned-q4km.gguf",
+    _HOME / "voicebridge-finetuned-q4km.gguf",
+]
+
+def _find_fine_gguf() -> str:
+    for c in _FINE_CANDIDATES:
+        if c.exists():
+            return str(c)
+    return str(_FINE_CANDIDATES[0])
+
+FINE_GGUF = os.environ.get("FINE_GGUF", _find_fine_gguf())
 
 _GLOBAL_CKPT: dict = {}
 
@@ -518,6 +529,8 @@ def main() -> None:
                         help="Print prompts, no inference")
     parser.add_argument("--no-resume",  action="store_true",
                         help="Ignore checkpoint, start fresh")
+    parser.add_argument("--output-num", type=int, default=None,
+                        help="Append _N to output filenames (e.g. --output-num 1 → model_comparison_1.json). Auto-picks next unused if omitted.")
     args = parser.parse_args()
 
     _GLOBAL_CKPT = {} if args.no_resume else _load_checkpoint()
@@ -540,9 +553,6 @@ def main() -> None:
     print("=" * 64)
 
     if not args.dry_run:
-        if not Path(_LLAMA_CLI).exists():
-            print(f"\n[ERROR] llama-cli not found at {_LLAMA_CLI}")
-            sys.exit(1)
         if not args.tuned_only and not Path(BASE_GGUF).exists():
             print(f"\n[ERROR] Base GGUF not found at {BASE_GGUF}")
             print("  Download: bash scripts/download_base_gguf.sh")
@@ -598,8 +608,28 @@ def main() -> None:
     docs_dir = _REPO_ROOT / "docs"
     docs_dir.mkdir(parents=True, exist_ok=True)
 
-    md_path   = docs_dir / "model_comparison.md"
-    json_path = docs_dir / "model_comparison.json"
+    # Determine output filename — use --output-num or auto-pick next unused
+    if args.output_num is not None:
+        suffix = f"_{args.output_num}"
+    else:
+        existing = list(docs_dir.glob("model_comparison_*.json"))
+        existing_nums = set()
+        for p in existing:
+            stem = p.stem  # e.g. model_comparison_1
+            try:
+                num = int(stem.split("_")[-1])
+                existing_nums.add(num)
+            except ValueError:
+                pass
+        next_num = 1
+        for candidate in range(1, 100):
+            if candidate not in existing_nums:
+                next_num = candidate
+                break
+        suffix = f"_{next_num}"
+
+    md_path   = docs_dir / f"model_comparison{suffix}.md"
+    json_path = docs_dir / f"model_comparison{suffix}.json"
 
     md_path.write_text(
         build_markdown(base_acc, tuned_acc, base_lat, tuned_lat, args.tuned_only),

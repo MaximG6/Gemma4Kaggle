@@ -147,8 +147,7 @@ class TriageClassifier:
             ValueError: If the model returns unparseable output.
             pydantic.ValidationError: If required fields are missing/invalid.
         """
-        schema = json.dumps(TriageOutput.model_json_schema(), indent=2)
-        prompt = _SYSTEM_PROMPT.format(schema=schema, transcript=transcript)
+        prompt = _SYSTEM_PROMPT.format(transcript=transcript)
         raw = self._tx._generate_text(prompt, max_tokens=512)
 
         # Try JSON first

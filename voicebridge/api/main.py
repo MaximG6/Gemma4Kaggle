@@ -19,13 +19,17 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
+import subprocess
+import tempfile
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -35,11 +39,12 @@ from api.audio_capture import resample_to_16k, router as audio_router
 from api.db import get_record, init_db, list_records, save_record
 from models.language_id import detect_language_from_audio
 from models.transcription import GemmaTranscriber, TranscriptionResult
+from pipeline.llama_infer import FINE_GGUF, LANG_NAMES, SYSTEM_PROMPT, run_inference
 from pipeline.pdf_generator import generate_triage_pdf
 from pipeline.triage import TriageClassifier
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_EDGE_MODEL_PATH  = str(_REPO_ROOT / "models" / "voicebridge-merged-v2")
+_EDGE_MODEL_PATH  = str(_REPO_ROOT / "models" / "voicebridge-finetuned-q4km.gguf") if Path(str(_REPO_ROOT / "models" / "voicebridge-finetuned-q4km.gguf")).exists() else "/mnt/host/c/Users/Maxim/.openclaw/workspace/Gemma4Kaggle/voicebridge/models/voicebridge-finetuned-q4km.gguf"
 _FULL_MODEL_PATH  = str(_REPO_ROOT / "models" / "voicebridge-merged-v2")
 _FRONTEND_DIR     = _REPO_ROOT / "frontend"
 
@@ -80,12 +85,67 @@ def _get_models() -> tuple[GemmaTranscriber, TriageClassifier]:
     return _edge_tx, _clf
 
 
+def _parse_triage_result(raw: str, latency: float, lang: str, raw_transcript: str = "") -> dict[str, Any]:
+    """Parse full triage JSON from raw model output."""
+    clean = re.sub(r'\x1b\[[0-9;]*[mGKHFABCDJKlh]', '', raw)
+    clean = re.sub(r'\x1b[()][AB012]', '', clean)
+    clean = re.sub(r'[\r\x00]', '', clean)
+
+    level = None
+    m_level = None
+    matches = list(re.finditer(r'"triage_level"\s*:\s*"([^"]+)"', clean, re.IGNORECASE))
+    if matches:
+        m_level = matches[-1]
+        level = m_level.group(1).lower().strip()
+        if level not in ("red", "orange", "yellow", "green", "blue"):
+            level = None
+
+    result: dict[str, Any] = {
+        "triage_level": level or "red",
+        "primary_complaint": "",
+        "red_flag_indicators": [],
+        "recommended_action": "",
+        "confidence_score": 0.5,
+        "latency_s": round(latency, 2),
+        "source_language": lang,
+        "referral_needed": False,
+        "reported_symptoms": [],
+        "vital_signs_reported": {},
+        "duration_of_symptoms": "Not recorded",
+        "relevant_history": "Not recorded",
+        "raw_transcript": raw_transcript,
+    }
+
+    # Try to extract full JSON
+    model_start = clean.rfind("<start_of_turn>model")
+    search = clean[model_start:] if model_start != -1 else clean
+    start = search.find("{")
+    if start != -1:
+        end = search.rfind("}") + 1
+        js = search[start:end] if end > start else search[start:] + "}"
+        js = re.sub(r",\s*}", "}", js)
+        js = re.sub(r",\s*]", "]", js)
+        try:
+            data = json.loads(js)
+            if "primary_complaint" in data:
+                result["primary_complaint"] = str(data["primary_complaint"])
+            if "red_flag_indicators" in data:
+                val = data["red_flag_indicators"]
+                result["red_flag_indicators"] = val if isinstance(val, list) else []
+            if "recommended_action" in data:
+                result["recommended_action"] = str(data["recommended_action"])
+            if "confidence_score" in data:
+                result["confidence_score"] = float(data["confidence_score"])
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    return result
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    print("Loading models at startup...")
-    _load_models()
-    print("Models loaded successfully.")
+    print("Models will load on first request (deferred).")
     yield
 
 
@@ -96,20 +156,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Flutter web runs on a different port — allow localhost origins for dev.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8080",
-        "http://localhost:8082",
-        "http://localhost:5000",
-        "http://localhost:3000",
-        "http://127.0.0.1:8080",
-        "http://127.0.0.1:8082",
-        "http://127.0.0.1:5000",
-        "http://127.0.0.1:3000",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -121,59 +170,164 @@ if _FRONTEND_DIR.exists() and any(_FRONTEND_DIR.iterdir()):
 
 
 async def _run_intake(file: UploadFile):
-    """Shared core: audio file → (record_id, TriageOutput)."""
+    """
+    Shared core: audio file → (record_id, TriageOutput).
+
+    Pipeline:
+      1. Resample uploaded audio to 16 kHz mono float32.
+      2. Transcribe to text via Gemma 4 native audio tower (base GGUF + mmproj),
+         calling llama-mtmd-cli on GPU 1.
+      3. Pass transcript to fine-tuned GGUF (TriageClassifier) for SATS triage.
+    """
+    import soundfile as sf
+    import tempfile
+
     raw = await file.read()
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     audio = resample_to_16k(raw)
     lang = detect_language_from_audio(audio)
+    duration_s = round(len(audio) / 16000, 2)
 
     edge_tx, clf = _get_models()
-    # Try audio transcription first, fall back to text-only if audio fails
+
+    # Write resampled audio to a temp WAV so llama-mtmd-cli can read it
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp_path = tmp.name
     try:
-        tx_result = edge_tx.transcribe(audio, hint_lang=lang)
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "audio" in error_msg and "token" in error_msg:
-            # Audio processing bug in transformers - use text-only fallback
-            tx_result = TranscriptionResult(
-                original_text="Audio transcription failed. Using text fallback.",
-                english_text="Patient presents with chest pain and shortness of breath.",
-                detected_language=lang or "en",
-                duration_s=round(len(audio) / 16000, 2),
-            )
-        else:
-            raise
-    triage = clf.classify(tx_result.english_text, source_lang=lang)
+        sf.write(tmp_path, audio, 16000)
+        transcript = edge_tx.transcribe_audio(tmp_path)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+    if not transcript:
+        raise HTTPException(status_code=422, detail="Audio transcription produced empty output.")
+
+    tx_result = TranscriptionResult(
+        original_text=transcript,
+        english_text=transcript,
+        detected_language=lang or "en",
+        duration_s=duration_s,
+    )
+    triage = clf.classify(tx_result.english_text, source_lang=lang or "en")
 
     record_id = str(uuid.uuid4())
     return record_id, triage
 
 
 @app.post("/intake/text")
-async def intake_text(body: dict, bg: BackgroundTasks):
+async def intake_text(request: Request, bg: BackgroundTasks):
     """
-    Text-only intake: plain text → TriageOutput JSON.
-    Skips audio transcription, goes straight to triage classification.
+    Text-only intake: plain text → triage JSON via fine-tuned GGUF.
+
+    Request body: {"text": "...", "lang": "en"}
+    Returns: triage_level, primary_complaint, red_flag_indicators,
+             recommended_action, confidence_score, latency_s, lang
     """
+    body = await request.json()
     text = body.get("text", "").strip()
+    lang = body.get("lang", "en") or "en"
     if not text:
         raise HTTPException(status_code=400, detail="No text provided.")
 
     try:
-        edge_tx, clf = _get_models()
-        triage = clf.classify(text, source_lang="en")
+        level, latency, raw = run_inference(text=text, lang=lang)
     except Exception as e:
         import traceback
         traceback.print_exc()
         print(f"TEXT INTAKE ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+    result = _parse_triage_result(raw, latency, lang, raw_transcript=text)
     record_id = str(uuid.uuid4())
-    triage_dict = triage.model_dump(mode="json")
+    triage_dict = result
     bg.add_task(save_record, record_id, triage_dict)
     return {"record_id": record_id, "triage": triage_dict}
+
+
+@app.post("/intake/audio")
+async def intake_audio(file: UploadFile, lang: str = "en"):
+    """
+    Audio intake: WAV upload → triage JSON via llama-mtmd-cli.
+
+    Accepts a WAV file, runs multimodal inference on GPU 0, returns
+    triage_level, primary_complaint, red_flag_indicators,
+    recommended_action, confidence_score, latency_s, lang.
+    """
+    import tempfile
+    import shutil
+
+    if not file.filename or not file.filename.lower().endswith(".wav"):
+        raise HTTPException(status_code=400, detail="Only .wav files are accepted.")
+
+    raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    # Save to temp WAV
+    tmp_path = Path(tempfile.gettempdir()) / f"vb_audio_{uuid.uuid4().hex}.wav"
+    tmp_path.write_bytes(raw_bytes)
+
+    try:
+        lang_name = LANG_NAMES.get(lang, "English")
+        sp = SYSTEM_PROMPT.format(lang_name=lang_name)
+        prompt = (
+            f"<start_of_turn>system\n{sp}<end_of_turn>\n"
+            f"<start_of_turn>user\n<start_of_audio>\n"
+            f"<end_of_audio>\nTriage this patient audio.<end_of_turn>\n"
+            f"<start_of_turn>model\n{{"
+        )
+
+        llama_mtmd = str(Path.home() / "llama.cpp" / "build" / "bin" / "llama-mtmd-cli")
+        if not Path(llama_mtmd).exists():
+            raise FileNotFoundError(f"llama-mtmd-cli not found at {llama_mtmd}")
+
+        t0 = time.time()
+        cmd = [
+            llama_mtmd,
+            "-m", str(Path.home() / "voicebridge-finetuned-q4km.gguf"),
+            "--mmproj", str(Path.home() / "models" / "mmproj-BF16.gguf"),
+            "--audio", str(tmp_path),
+            "-p", prompt,
+            "-n", "1000",
+            "--threads", "4",
+            "--temp", "1.0",
+            "--top-k", "64",
+            "--top-p", "0.95",
+            "-ngl", "99",
+            "--no-warmup",
+            "--jinja",
+        ]
+        env = os.environ.copy()
+        env["CUDA_VISIBLE_DEVICES"] = "0"
+        result_proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=600,
+            env=env,
+        )
+        latency = time.time() - t0
+
+        raw_output = result_proc.stdout.decode("utf-8", errors="replace")
+        raw_output = re.sub(r'\x1b\[[0-9;]*[mGKHFABCDJKlh]', '', raw_output)
+        raw_output = re.sub(r'\x1b[()][AB012]', '', raw_output)
+        raw_output = re.sub(r'[\r\x00]', '', raw_output)
+
+        # Transcribe first to capture raw transcript and detected language
+        try:
+            edge_tx_for_transcribe, _ = _get_models()
+            transcript_text = edge_tx_for_transcribe.transcribe_audio(str(tmp_path))
+        except Exception:
+            transcript_text = ""
+
+        triage_out = _parse_triage_result(raw_output, latency, lang, raw_transcript=transcript_text)
+        record_id = str(uuid.uuid4())
+        return {"record_id": record_id, "triage": triage_out}
+
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 @app.post("/intake")
@@ -193,6 +347,10 @@ async def intake(file: UploadFile, bg: BackgroundTasks):
         print(f"INTAKE ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     triage_dict = triage.model_dump(mode="json")
+    # Ensure transcript and detected language are in output
+    if 'raw_transcript' not in triage_dict or not triage_dict.get('raw_transcript'):
+        triage_dict['raw_transcript'] = tx_result.original_text
+    triage_dict['source_language'] = tx_result.detected_language
     bg.add_task(save_record, record_id, triage_dict)
     return {"record_id": record_id, "triage": triage_dict}
 
@@ -237,12 +395,16 @@ You have two possible response modes:
 
 MODE 1 — QUESTION: If you do not have enough information to confidently assign a triage level, respond with a single plain-text clarifying question. Ask only the single most important missing piece of information. Do not output JSON in this mode. Do not number the question. Just ask it directly.
 
-MODE 2 — TRIAGE JSON: When you have enough information to make a confident triage decision, output ONLY a JSON object with these exact fields:
-  triage_level        — lowercase only: red, orange, yellow, green, or blue
-  primary_complaint   — exactly one sentence, clinical diagnosis only
-  red_flag_indicators — JSON array of strings always, use [] if none
-  recommended_action  — maximum 2 sentences, specific and actionable only
-  confidence_score    — float between 0.0 and 1.0 only, never an integer
+MODE 2 — TRIAGE JSON: When you have enough information to make a confident triage decision, output ONLY valid JSON. Your entire response must be a single JSON object with no text before or after it. Example:
+{{
+  "triage_level": "yellow",
+  "primary_complaint": "Moderate headache with visual changes, GCS 15",
+  "red_flag_indicators": ["headache", "visual changes"],
+  "recommended_action": "Monitor neurological status closely. Urgent review if symptoms worsen.",
+  "confidence_score": 0.85
+}}
+
+CRITICAL: Use double quotes for all keys and string values. Use [] for empty arrays. Use a float for confidence_score (e.g. 0.85 not 85).
 
 All field values must be in English regardless of input language.
 
@@ -268,31 +430,42 @@ def _try_parse_json(text: str) -> dict:
         clean = clean.split("[End thinking]")[-1].strip()
     clean = re.sub(r"```json\s*", "", clean)
     clean = re.sub(r"```\s*", "", clean)
+    # Handle double braces from prompt escaping
+    clean = clean.replace("{{", "{").replace("}}", "}")
+
+    # Try JSON first
     start = clean.find("{")
-    if start == -1:
-        return {}
-    end = clean.rfind("}") + 1
-    js = clean[start:end] if end > start else clean[start:] + "}"
-    js = re.sub(r",\s*}", "}", js)
-    js = re.sub(r",\s*]", "]", js)
-    try:
-        return json.loads(js)
-    except json.JSONDecodeError:
-        # Fallback: regex extract key fields
-        result = {}
-        m = re.search(r'"triage_level"\s*:\s*"([^"]+)"', js)
-        if m:
-            result["triage_level"] = m.group(1).lower()
-        m = re.search(r'"primary_complaint"\s*:\s*([^"]*?)\s*([,}])', js)
-        if m:
-            result["primary_complaint"] = m.group(1).strip('" ').strip()
-        m = re.search(r'"recommended_action"\s*:\s*([^"]*?)\s*([,}])', js)
-        if m:
-            result["recommended_action"] = m.group(1).strip('" ').strip()
-        m = re.search(r'"confidence_score"\s*:\s*([\d.]+)', js)
-        if m:
-            result["confidence_score"] = float(m.group(1))
-        return result
+    if start != -1:
+        end = clean.rfind("}") + 1
+        js = clean[start:end] if end > start else clean[start:] + "}"
+        js = re.sub(r",\s*}", "}", js)
+        js = re.sub(r",\s*\]", "]", js)
+        try:
+            return json.loads(js)
+        except json.JSONDecodeError:
+            pass
+
+    # Fallback: handle key: value format (no JSON braces)
+    result = {}
+    m = re.search(r'triage_level\s*:\s*(\w+)', clean, re.IGNORECASE)
+    if m:
+        result["triage_level"] = m.group(1).lower()
+    m = re.search(r'primary_complaint\s*:\s*(.+?)(?=\n\w|\Z)', clean, re.IGNORECASE | re.DOTALL)
+    if m:
+        result["primary_complaint"] = m.group(1).strip()
+    m = re.search(r'recommended_action\s*:\s*(.+?)(?=\n\w|\Z)', clean, re.IGNORECASE | re.DOTALL)
+    if m:
+        result["recommended_action"] = m.group(1).strip()
+    m = re.search(r'confidence_score\s*:\s*([\d.]+)', clean, re.IGNORECASE)
+    if m:
+        result["confidence_score"] = float(m.group(1))
+    m = re.search(r'red_flag_indicators\s*:\s*(\[.*?\])', clean, re.IGNORECASE)
+    if m:
+        try:
+            result["red_flag_indicators"] = json.loads(m.group(1))
+        except json.JSONDecodeError:
+            result["red_flag_indicators"] = []
+    return result
 
 
 class InteractiveRequest(BaseModel):

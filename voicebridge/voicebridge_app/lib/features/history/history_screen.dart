@@ -72,7 +72,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         child: SafeArea(
           child: ClipRect(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
               child: Container(
                 decoration: BoxDecoration(
                   color: Theme.of(context).brightness == Brightness.dark
@@ -122,8 +122,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                 onChanged: (v) =>
                                     setState(() => _searchQuery = v),
                                 style: AppTypography.bodyMedium,
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   hintText: 'Search cases...',
+                                  filled: true,
+                                  fillColor: Colors.transparent,
                                   border: InputBorder.none,
                                   isDense: true,
                                   contentPadding: EdgeInsets.zero,

@@ -14,6 +14,157 @@ import 'widgets/detail_card.dart';
 import 'widgets/red_flags_card.dart';
 import 'widgets/action_card.dart';
 
+class _ThinkingDropdown extends StatefulWidget {
+  const _ThinkingDropdown({required this.thinking});
+  final String thinking;
+
+  @override
+  State<_ThinkingDropdown> createState() => _ThinkingDropdownState();
+}
+
+class _ThinkingDropdownState extends State<_ThinkingDropdown>
+    with SingleTickerProviderStateMixin {
+  bool _expanded = false;
+  late final AnimationController _controller;
+  late final Animation<double> _chevronTurn;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _chevronTurn = Tween<double>(begin: 0, end: 0.5).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    _expanded ? _controller.forward() : _controller.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headerTextColor =
+        isDark ? const Color(0xFFBDBDBD) : AppColors.textSecondary;
+    final bodyTextColor =
+        isDark ? const Color(0xFFBDBDBD) : AppColors.textPrimary;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.white.withOpacity(0.3),
+          width: 1.0,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF1A2B3C).withOpacity(0.7)
+                  : Colors.white.withOpacity(0.85),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              children: [
+                InkWell(
+                  onTap: _toggle,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.psychology_outlined,
+                            size: 16,
+                            color: AppColors.secondary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'MODEL THINKING',
+                          style: AppTypography.labelLarge.copyWith(
+                            color: headerTextColor,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const Spacer(),
+                        RotationTransition(
+                          turns: _chevronTurn,
+                          child: Icon(
+                            Icons.expand_more_rounded,
+                            color: headerTextColor,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                AnimatedCrossFade(
+                  firstChild: const SizedBox.shrink(),
+                  secondChild: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Divider(
+                          color: AppColors.textSecondary.withOpacity(0.15),
+                          height: 1,
+                        ),
+                        const SizedBox(height: 14),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 240),
+                          child: SingleChildScrollView(
+                            child: Text(
+                              widget.thinking,
+                              style: AppTypography.monoSmall.copyWith(
+                                color: bodyTextColor,
+                                height: 1.6,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  crossFadeState: _expanded
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 200),
+                  sizeCurve: Curves.easeInOut,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ResultsScreen extends ConsumerWidget {
   const ResultsScreen({super.key, required this.id});
 
@@ -53,7 +204,7 @@ class ResultsScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           CustomScrollView(
@@ -93,6 +244,7 @@ class ResultsScreen extends ConsumerWidget {
           DetailCard(
             title: 'PRIMARY COMPLAINT',
             icon: Icons.person_outline_rounded,
+            accentColor: AppColors.accentTeal,
             child: DetailText(output.primaryComplaint),
           ),
           const SizedBox(height: 12),
@@ -100,7 +252,8 @@ class ResultsScreen extends ConsumerWidget {
             DetailCard(
               title: 'SYMPTOMS',
               icon: Icons.list_alt_rounded,
-              child: DetailChips(items: output.reportedSymptoms),
+              accentColor: AppColors.accentPink,
+              child: DetailChips(items: output.reportedSymptoms, color: AppColors.accentPink),
             ),
             const SizedBox(height: 12),
           ],
@@ -108,6 +261,7 @@ class ResultsScreen extends ConsumerWidget {
             DetailCard(
               title: 'VITALS',
               icon: Icons.monitor_heart_outlined,
+              accentColor: AppColors.accentCyan,
               child: VitalsGrid(vitals: output.vitalSignsReported),
             ),
             const SizedBox(height: 12),
@@ -115,6 +269,7 @@ class ResultsScreen extends ConsumerWidget {
           DetailCard(
             title: 'DURATION',
             icon: Icons.schedule_rounded,
+            accentColor: AppColors.accentAmber,
             child: DetailText(output.durationOfSymptoms),
           ),
           const SizedBox(height: 12),
@@ -122,6 +277,7 @@ class ResultsScreen extends ConsumerWidget {
             DetailCard(
               title: 'HISTORY',
               icon: Icons.history_rounded,
+              accentColor: AppColors.accentViolet,
               child: DetailText(output.relevantHistory),
             ),
             const SizedBox(height: 12),
@@ -129,6 +285,10 @@ class ResultsScreen extends ConsumerWidget {
           RedFlagsCard(flags: output.redFlagIndicators),
           if (output.redFlagIndicators.isNotEmpty) const SizedBox(height: 12),
           ActionCard(action: output.recommendedAction, level: level),
+          if (output.rawThinking != null && output.rawThinking!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _ThinkingDropdown(thinking: output.rawThinking!),
+          ],
           const SizedBox(height: 12),
           GlassCard(
             child: Row(
@@ -204,7 +364,7 @@ class ResultsScreen extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return ClipRRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: Container(
           padding: EdgeInsets.only(
             left: 16,

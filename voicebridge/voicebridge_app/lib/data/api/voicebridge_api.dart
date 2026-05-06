@@ -6,7 +6,7 @@ import '../models/app_record.dart';
 
 class VoicebridgeApi {
   VoicebridgeApi({String? baseUrl})
-      : _baseUrl = baseUrl ?? 'http://localhost:8000';
+      : _baseUrl = baseUrl ?? 'http://172.24.158.101:8001';
 
   final String _baseUrl;
 
@@ -22,31 +22,12 @@ class VoicebridgeApi {
     }
   }
 
-  Future<TriageOutput> postIntake(Uint8List audioBytes, {String filename = 'recording.webm'}) async {
-    final request =
-        http.MultipartRequest('POST', Uri.parse('$_baseUrl/intake'));
-    request.files.add(
-      http.MultipartFile.fromBytes('file', audioBytes, filename: filename),
-    );
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
-
-    if (response.statusCode != 200) {
-      throw ApiException(
-        'Intake failed: ${response.statusCode} ${response.body}',
-      );
-    }
-
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
-    return TriageOutput.fromJson(json['triage'] as Map<String, dynamic>);
-  }
-
-  Future<TriageOutput> postText(String text) async {
+  Future<Map<String, dynamic>> postText(String text, {String lang = 'en'}) async {
     final res = await http
         .post(
           Uri.parse('$_baseUrl/intake/text'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'text': text}),
+          body: jsonEncode({'text': text, 'lang': lang}),
         )
         .timeout(const Duration(seconds: 60));
 
@@ -57,7 +38,32 @@ class VoicebridgeApi {
     }
 
     final json = jsonDecode(res.body) as Map<String, dynamic>;
-    return TriageOutput.fromJson(json['triage'] as Map<String, dynamic>);
+    return {
+      'record_id': json['record_id'] as String?,
+      'output': TriageOutput.fromJson(json['triage'] as Map<String, dynamic>),
+    };
+  }
+
+  Future<Map<String, dynamic>> postIntake(Uint8List audioBytes, {String lang = 'en', String filename = 'recording.wav'}) async {
+    final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/intake/audio'));
+    request.files.add(
+      http.MultipartFile.fromBytes('file', audioBytes, filename: filename),
+    );
+    request.fields['lang'] = lang;
+    final streamed = await request.send().timeout(const Duration(seconds: 120));
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode != 200) {
+      throw ApiException(
+        'Audio intake failed: ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return {
+      'record_id': json['record_id'] as String?,
+      'output': TriageOutput.fromJson(json['triage'] as Map<String, dynamic>),
+    };
   }
 
   Future<AppRecord?> getRecord(String id) async {
@@ -84,8 +90,9 @@ class VoicebridgeApi {
   Future<Map<String, dynamic>> postInteractive(
     String text, {
     String? sessionId,
+    String lang = 'en',
   }) async {
-    final body = <String, dynamic>{'text': text};
+    final body = <String, dynamic>{'text': text, 'lang': lang};
     if (sessionId != null) body['session_id'] = sessionId;
 
     final res = await http

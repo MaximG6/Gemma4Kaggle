@@ -20,27 +20,46 @@ class ActionCard extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF1A2B3C).withOpacity(0.85)
-                : Colors.white.withOpacity(0.72),
+            gradient: LinearGradient(
+              colors: [
+                level.color.withOpacity(isDark ? 0.28 : 0.16),
+                isDark
+                    ? const Color(0xFF1A2B3C).withOpacity(0.90)
+                    : Colors.white.withOpacity(0.92),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark
-                  ? Colors.white.withOpacity(0.12)
-                  : Colors.white.withOpacity(0.5),
+              color: level.color.withOpacity(isDark ? 0.35 : 0.22),
               width: 1.0,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: level.color.withOpacity(isDark ? 0.18 : 0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: IntrinsicHeight(
             child: Row(
               children: [
                 Container(
-                  width: 5,
+                  width: 6,
                   decoration: BoxDecoration(
-                    color: level.color,
+                    gradient: LinearGradient(
+                      colors: [
+                        level.color,
+                        level.color.withOpacity(0.65),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(20),
                       bottomLeft: Radius.circular(20),
@@ -55,16 +74,25 @@ class ActionCard extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              Icons.medical_services_rounded,
-                              size: 16,
-                              color: isDark ? Colors.white70 : AppColors.textSecondary,
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: level.color.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.medical_services_rounded,
+                                size: 14,
+                                color: level.color,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Text(
                               'RECOMMENDED ACTION',
                               style: AppTypography.labelLarge.copyWith(
-                                color: isDark ? Colors.white70 : AppColors.textSecondary,
+                                color: isDark
+                                    ? const Color(0xFFBDBDBD)
+                                    : AppColors.textSecondary,
                                 letterSpacing: 0.8,
                               ),
                             ),

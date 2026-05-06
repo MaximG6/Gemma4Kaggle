@@ -10,48 +10,60 @@ class GlassCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(20),
     this.borderRadius = 20,
     this.margin,
+    this.accentColor,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
   final double borderRadius;
   final EdgeInsetsGeometry? margin;
+  /// When set, tints the card background, border, and shadow with this color.
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasAccent = accentColor != null;
+
+    final Color bgColor;
+    if (hasAccent) {
+      bgColor = isDark
+          ? Color.lerp(const Color(0xFF1A2B3C), accentColor!, 0.10)!
+              .withOpacity(0.85)
+          : Color.lerp(Colors.white, accentColor!, 0.06)!;
+    } else {
+      bgColor = isDark
+          ? const Color(0xFF1A2B3C).withOpacity(0.7)
+          : Colors.white.withOpacity(0.85);
+    }
+
     return Container(
       margin: margin,
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF1A2B3C).withOpacity(0.6)
-            : Colors.white.withOpacity(0.72),
+        color: bgColor,
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.15)
-              : Colors.white.withOpacity(0.6),
-          width: 1.0,
+          color: hasAccent
+              ? accentColor!.withOpacity(isDark ? 0.30 : 0.22)
+              : (isDark
+                  ? Colors.white.withOpacity(0.12)
+                  : AppColors.textSecondary.withOpacity(0.15)),
+          width: hasAccent ? 1.5 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.25 : 0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-          BoxShadow(
-            color: isDark
-                ? Colors.transparent
-                : Colors.white.withOpacity(0.5),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
+            color: hasAccent
+                ? accentColor!.withOpacity(isDark ? 0.18 : 0.12)
+                : Colors.black.withOpacity(isDark ? 0.2 : 0.06),
+            blurRadius: hasAccent ? 14 : 8,
+            offset: hasAccent ? const Offset(0, 3) : const Offset(0, 2),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
           child: Padding(
             padding: padding,
             child: child,
@@ -242,7 +254,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return ClipRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: Container(
           height: preferredSize.height + MediaQuery.of(context).padding.top,
           padding: EdgeInsets.only(
@@ -278,7 +290,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
                     Text(
                       title,
                       style: AppTypography.headlineMedium.copyWith(
-                        color: isDark ? Colors.white : AppColors.textPrimary,
+                        color: isDark ? const Color(0xFFE0E0E0) : AppColors.textPrimary,
                       ),
                     ),
                     if (subtitle != null)

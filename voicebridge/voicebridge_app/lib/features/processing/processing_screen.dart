@@ -11,7 +11,9 @@ import '../../providers/pipeline_provider.dart';
 import 'widgets/pipeline_progress.dart';
 
 class ProcessingScreen extends ConsumerStatefulWidget {
-  const ProcessingScreen({super.key});
+  final String inputMode;
+
+  const ProcessingScreen({super.key, this.inputMode = 'audio'});
 
   @override
   ConsumerState<ProcessingScreen> createState() => _ProcessingScreenState();
@@ -43,20 +45,43 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
       next.whenData((state) {
         if (state.status == PipelineStatus.done && state.result != null) {
           _elapsedTimer?.cancel();
-          context.go('/results/latest');
+          if (context.mounted) {
+            if (state.recordId != null && state.recordId!.isNotEmpty) {
+              context.go('/case/${state.recordId}');
+            } else {
+              context.go('/home');
+            }
+          }
         }
       });
     });
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: MeshGradientBackground(
         child: SafeArea(
-          child: pipelineAsync.when(
-            data: (state) => _buildContent(state),
-            loading: () => const Center(
-              child: CircularProgressIndicator(color: AppColors.secondary),
-            ),
-            error: (e, _) => _buildError(e.toString()),
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: IconButton(
+                    icon: Icon(Icons.arrow_back_ios_rounded, color: isDark ? Colors.white : AppColors.textPrimary),
+                    onPressed: () => context.go('/home'),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: pipelineAsync.when(
+                  data: (state) => _buildContent(state),
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(color: AppColors.secondary),
+                  ),
+                  error: (e, _) => _buildError(e.toString()),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -64,6 +89,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
   }
 
   Widget _buildContent(PipelineState state) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -75,11 +101,11 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDark ? Colors.white.withOpacity(0.1) : AppColors.secondary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.hourglass_top_rounded,
-                    color: Colors.white70, size: 20),
+                child: Icon(Icons.hourglass_top_rounded,
+                    color: isDark ? Colors.white70 : AppColors.secondary, size: 20),
               ),
               const SizedBox(width: 12),
               Column(
@@ -88,12 +114,12 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
                   Text(
                     'Processing',
                     style: AppTypography.headlineMedium
-                        .copyWith(color: Colors.white),
+                        .copyWith(color: isDark ? Colors.white : AppColors.textPrimary),
                   ),
                   Text(
                     'Elapsed: ${formatDuration(_elapsed)}',
                     style: AppTypography.bodySmall
-                        .copyWith(color: Colors.white60),
+                        .copyWith(color: isDark ? Colors.white60 : AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -104,6 +130,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
             child: PipelineProgressStepper(
               currentStatus: state.status,
               elapsed: _elapsed,
+              inputMode: widget.inputMode,
             ),
           ),
           const SizedBox(height: 24),
@@ -114,11 +141,11 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
+                    color: isDark ? Colors.white.withOpacity(0.08) : AppColors.secondary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.audio_file_rounded,
-                      color: Colors.white54, size: 18),
+                  child: Icon(Icons.audio_file_rounded,
+                      color: isDark ? Colors.white54 : AppColors.textSecondary, size: 18),
                 ),
                 const SizedBox(width: 12),
                 Column(
@@ -127,12 +154,12 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
                     Text(
                       'Audio clip',
                       style: AppTypography.labelMedium
-                          .copyWith(color: Colors.white60),
+                          .copyWith(color: isDark ? Colors.white60 : AppColors.textPrimary),
                     ),
                     Text(
                       'Recording in progress',
                       style: AppTypography.bodySmall
-                          .copyWith(color: Colors.white38),
+                          .copyWith(color: isDark ? Colors.white38 : AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -145,6 +172,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
   }
 
   Widget _buildError(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -157,16 +185,16 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
               const SizedBox(height: 16),
               Text('Pipeline Error',
                   style: AppTypography.headlineSmall
-                      .copyWith(color: Colors.white)),
+                      .copyWith(color: isDark ? Colors.white : AppColors.textPrimary)),
               const SizedBox(height: 8),
               Text(message,
                   style:
-                      AppTypography.bodySmall.copyWith(color: Colors.white60),
+                      AppTypography.bodySmall.copyWith(color: isDark ? Colors.white60 : AppColors.textSecondary),
                   textAlign: TextAlign.center),
               const SizedBox(height: 20),
               TextButton(
                 onPressed: () => context.go('/home'),
-                child: const Text('Go Home'),
+                child: Text('Go Home', style: AppTypography.labelMedium.copyWith(color: isDark ? Colors.white : AppColors.textPrimary)),
               ),
             ],
           ),

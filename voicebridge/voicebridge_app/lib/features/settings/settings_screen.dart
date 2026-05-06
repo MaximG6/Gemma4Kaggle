@@ -25,7 +25,7 @@ class SettingsScreen extends ConsumerWidget {
             flexibleSpace: FlexibleSpaceBar(
               background: ClipRect(
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
                   child: Container(
                     decoration: BoxDecoration(
                       color: Theme.of(context).brightness == Brightness.dark

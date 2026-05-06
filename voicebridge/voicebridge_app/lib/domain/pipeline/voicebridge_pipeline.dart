@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import '../../data/models/triage_output.dart';
 
 enum PipelineStatus {
   idle,
@@ -71,19 +70,22 @@ extension PipelineStatusExtension on PipelineStatus {
 }
 
 abstract class VoicebridgePipeline {
-  Future<TriageOutput> runPipeline(
+  Future<Map<String, dynamic>> runPipeline(
     Uint8List audioBytes, {
+    String lang = 'en',
     void Function(PipelineStatus)? onStatusChange,
   });
 
-  Future<TriageOutput> runTextPipeline(
+  Future<Map<String, dynamic>> runTextPipeline(
     String text, {
+    String lang = 'en',
     void Function(PipelineStatus)? onStatusChange,
   });
 
   Future<Map<String, dynamic>> runInteractiveTurn(
     String text, {
     String? sessionId,
+    String lang = 'en',
   });
 
   void dispose();

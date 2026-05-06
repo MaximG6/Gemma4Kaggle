@@ -38,14 +38,15 @@ class _QuickActionCardState extends State<QuickActionCard>
         return ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: const [
-                    Color(0xFF0D2137),
+                    AppColors.accentViolet,
                     AppColors.secondary,
+                    AppColors.accentCyan,
                     Color(0xFF0E4A55),
                   ],
                   begin: Alignment.lerp(
@@ -162,26 +163,43 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: filled ? Colors.white : Colors.transparent,
+          gradient: filled ? const LinearGradient(
+            colors: [Colors.white, Color(0xFFE0F7FA)],
+          ) : null,
+          color: filled ? null : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: Colors.white.withOpacity(filled ? 0 : 0.4),
+            color: filled ? Colors.white.withOpacity(0.9) : Colors.white.withOpacity(0.4),
             width: 1.5,
           ),
+          boxShadow: filled ? [
+            BoxShadow(
+              color: Colors.white.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ] : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: filled ? AppColors.secondary : Colors.white,
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: filled ? AppColors.secondary.withOpacity(0.1) : Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: filled ? AppColors.secondary : Colors.white,
+              ),
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: AppTypography.labelLarge.copyWith(
-                color: filled ? AppColors.secondary : Colors.white,
+                color: filled ? AppColors.primary : Colors.white,
                 fontWeight: FontWeight.w600,
               ),
             ),

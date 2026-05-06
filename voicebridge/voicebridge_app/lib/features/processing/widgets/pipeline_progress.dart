@@ -3,40 +3,62 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../domain/pipeline/voicebridge_pipeline.dart';
 
+class _StepDef {
+  final int stage;
+  final IconData icon;
+  final String label;
+  const _StepDef(this.stage, this.icon, this.label);
+}
+
 class PipelineProgressStepper extends StatelessWidget {
   const PipelineProgressStepper({
     super.key,
     required this.currentStatus,
     required this.elapsed,
+    this.inputMode = 'audio',
   });
 
   final PipelineStatus currentStatus;
   final Duration elapsed;
+  final String inputMode;
 
-  static const _steps = [
-    (PipelineStatus.transcribing, Icons.hearing_rounded, 'Preparing audio'),
-    (PipelineStatus.transcribing, Icons.translate_rounded, 'Detecting language'),
-    (PipelineStatus.transcribing, Icons.record_voice_over_rounded, 'Transcribing'),
-    (PipelineStatus.triaging, Icons.analytics_rounded, 'Analyzing triage'),
-    (PipelineStatus.generatingReport, Icons.picture_as_pdf_rounded, 'Generating report'),
-  ];
+  List<_StepDef> _getSteps() {
+    if (inputMode == 'text') {
+      return [
+        const _StepDef(0, Icons.text_fields, 'Receiving text input'),
+        const _StepDef(1, Icons.language, 'Detecting language'),
+        const _StepDef(1, Icons.local_hospital, 'Extracting symptoms'),
+        const _StepDef(2, Icons.checklist, 'Applying triage rules'),
+        const _StepDef(2, Icons.warning_amber, 'Evaluating urgency level'),
+        const _StepDef(3, Icons.picture_as_pdf, 'Generating clinical report'),
+      ];
+    }
+    return [
+      const _StepDef(0, Icons.file_upload, 'Loading audio file'),
+      const _StepDef(1, Icons.equalizer, 'Processing audio stream'),
+      const _StepDef(1, Icons.mic_none, 'Transcribing speech to text'),
+      const _StepDef(2, Icons.language, 'Detecting language'),
+      const _StepDef(2, Icons.local_hospital, 'Extracting symptoms'),
+      const _StepDef(2, Icons.checklist, 'Applying triage rules'),
+      const _StepDef(3, Icons.picture_as_pdf, 'Generating clinical report'),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
-    final currentIdx = currentStatus.stepIndex;
-
+    final steps = _getSteps();
     return Column(
-      children: List.generate(_steps.length, (i) {
-        final (_, icon, label) = _steps[i];
-        final isDone = currentIdx > i;
-        final isActive = currentIdx == i;
+      children: List.generate(steps.length, (i) {
+        final step = steps[i];
+        final isDone = currentStatus.stepIndex > step.stage;
+        final isActive = currentStatus.stepIndex == step.stage;
 
         return _StepRow(
-          icon: icon,
-          label: label,
+          icon: step.icon,
+          label: step.label,
           isDone: isDone,
           isActive: isActive,
-          isLast: i == _steps.length - 1,
+          isLast: i == steps.length - 1,
         );
       }),
     );
@@ -60,18 +82,45 @@ class _StepRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color iconColor;
     Color lineColor;
+    BoxDecoration boxDecoration;
 
     if (isDone) {
       iconColor = AppColors.secondary;
       lineColor = AppColors.secondary;
+      boxDecoration = BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.secondary.withOpacity(0.2),
+        border: Border.all(color: AppColors.secondary.withOpacity(0.5), width: 1.5),
+      );
     } else if (isActive) {
       iconColor = Colors.white;
-      lineColor = Colors.white24;
+      lineColor = AppColors.accentTeal.withOpacity(0.4);
+      boxDecoration = BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [AppColors.secondary, AppColors.accentTeal],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.secondary.withOpacity(0.4),
+            blurRadius: 12,
+            spreadRadius: 2,
+          ),
+        ],
+      );
     } else {
-      iconColor = Colors.white30;
-      lineColor = Colors.white12;
+      iconColor = isDark ? Colors.white30 : AppColors.textSecondary.withOpacity(0.4);
+      lineColor = isDark ? Colors.white12 : Colors.black.withOpacity(0.08);
+      boxDecoration = BoxDecoration(
+        shape: BoxShape.circle,
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04),
+        border: Border.all(color: iconColor, width: 1.5),
+      );
     }
 
     return Row(
@@ -83,18 +132,7 @@ class _StepRow extends StatelessWidget {
               duration: const Duration(milliseconds: 300),
               width: 40,
               height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDone
-                    ? AppColors.secondary.withOpacity(0.2)
-                    : isActive
-                        ? Colors.white.withOpacity(0.15)
-                        : Colors.white.withOpacity(0.05),
-                border: Border.all(
-                  color: iconColor.withOpacity(0.5),
-                  width: 1.5,
-                ),
-              ),
+              decoration: boxDecoration,
               child: isDone
                   ? const Icon(Icons.check_rounded,
                       color: AppColors.secondary, size: 18)
@@ -104,7 +142,12 @@ class _StepRow extends StatelessWidget {
               Container(
                 width: 2,
                 height: 32,
-                color: lineColor,
+                decoration: BoxDecoration(
+                  gradient: isActive ? LinearGradient(
+                    colors: [AppColors.secondary.withOpacity(0.6), AppColors.accentTeal.withOpacity(0.2)],
+                  ) : null,
+                  color: isActive ? null : lineColor,
+                ),
               ),
           ],
         ),
@@ -116,15 +159,14 @@ class _StepRow extends StatelessWidget {
               duration: const Duration(milliseconds: 200),
               style: isDone
                   ? AppTypography.bodyMedium.copyWith(
-                      color: Colors.white60,
-                      decoration: TextDecoration.lineThrough,
+                      color: isDark ? Colors.white60 : const Color(0xFF37474F),
                     )
                   : isActive
                       ? AppTypography.bodyMedium.copyWith(
-                          color: Colors.white,
+                          color: isDark ? Colors.white : const Color(0xFF263238),
                           fontWeight: FontWeight.w600,
                         )
-                      : AppTypography.bodyMedium.copyWith(color: Colors.white30),
+                      : AppTypography.bodyMedium.copyWith(color: isDark ? Colors.white30 : const Color(0xFF90A4AE)),
               child: Text(label),
             ),
           ),

@@ -6,7 +6,8 @@ import '../../core/theme/colors.dart';
 import '../../core/theme/glass.dart';
 import '../../core/theme/typography.dart';
 import '../../data/api/voicebridge_api.dart';
-import '../../providers/pipeline_provider.dart';
+
+import '../../providers/settings_provider.dart';
 
 class InteractiveScreen extends ConsumerStatefulWidget {
   const InteractiveScreen({super.key});
@@ -35,6 +36,15 @@ class _InteractiveScreenState extends ConsumerState<InteractiveScreen> {
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _loading) return;
+    if (_turnCount >= _maxTurns) {
+      setState(() {
+        _messages.add({
+          'role': 'model',
+          'content': 'Maximum turns reached. The AI will now make a final triage decision.',
+        });
+      });
+      return;
+    }
     _controller.clear();
 
     setState(() {
@@ -43,9 +53,16 @@ class _InteractiveScreenState extends ConsumerState<InteractiveScreen> {
     });
 
     try {
+      final lang = ref.read(settingsProvider).selectedLanguage;
+      final codes = <String, String>{
+        'English': 'en', 'Swahili': 'sw', 'Hausa': 'ha',
+        'Bengali': 'bn', 'Tagalog': 'tl', 'Hindi': 'hi', 'French': 'fr',
+      };
+      final langCode = codes[lang] ?? 'en';
       final result = await _api.postInteractive(
         text,
         sessionId: _sessionId,
+        lang: langCode,
       );
 
       _sessionId = result['session_id'] as String?;
@@ -62,12 +79,22 @@ class _InteractiveScreenState extends ConsumerState<InteractiveScreen> {
       if (isFinal) {
         final triage = result['triage'];
         if (triage != null) {
-          // Navigate to results - for now go to processing then results
-          // The triage is already saved by backend
+          final level = (triage['triage_level'] as String?)?.toUpperCase() ?? 'UNKNOWN';
+          final complaint = triage['primary_complaint'] as String? ?? '';
+          final action = triage['recommended_action'] as String? ?? '';
+          final confidence = (triage['confidence_score'] as num?)?.toDouble() ?? 0.0;
+
+          setState(() {
+            _messages.add({
+              'role': 'model',
+              'content': '''\n🏥 TRIAGE COMPLETE\n\nLevel: $level\nComplaint: $complaint\nAction: $action\nConfidence: ${(confidence * 100).toStringAsFixed(0)}%''',
+            });
+          });
+
           if (mounted) {
-            context.go('/home');
-            // Show a snackbar or dialog about the result
-            // For now, just navigate home - the result is in history
+            Future.delayed(const Duration(seconds: 2), () {
+              if (mounted) context.go('/home');
+            });
           }
         }
       }
@@ -242,7 +269,7 @@ class _InteractiveScreenState extends ConsumerState<InteractiveScreen> {
         bottomRight: const Radius.circular(16),
       ),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
@@ -274,6 +301,7 @@ class _InteractiveScreenState extends ConsumerState<InteractiveScreen> {
   }
 
   Widget _buildLoadingBubble() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -288,15 +316,15 @@ class _InteractiveScreenState extends ConsumerState<InteractiveScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.65),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.1),
+                    color: isDark ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.5),
                     width: 1.0,
                   ),
                 ),
@@ -315,7 +343,7 @@ class _InteractiveScreenState extends ConsumerState<InteractiveScreen> {
                     Text(
                       'Thinking...',
                       style: AppTypography.bodySmall.copyWith(
-                        color: Colors.white70,
+                        color: isDark ? Colors.white70 : AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -344,8 +372,10 @@ class _InteractiveScreenState extends ConsumerState<InteractiveScreen> {
                 decoration: InputDecoration(
                   hintText: 'Type your answer...',
                   hintStyle: AppTypography.bodyMedium.copyWith(
-                    color: isDark ? Colors.white38 : Colors.black38,
+                    color: isDark ? Colors.white38 : AppColors.textSecondary.withOpacity(0.6),
                   ),
+                  filled: true,
+                  fillColor: Colors.transparent,
                   border: InputBorder.none,
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),

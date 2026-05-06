@@ -9,56 +9,51 @@ class DetailCard extends StatelessWidget {
     required this.title,
     required this.child,
     this.icon,
+    this.accentColor,
   });
 
   final String title;
   final Widget child;
   final IconData? icon;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.white.withOpacity(0.3),
-          width: 1.0,
-        ),
-      ),
-      child: GlassCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                if (icon != null) ...[
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: AppColors.secondary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(icon, size: 16, color: AppColors.secondary),
+    final color = accentColor ?? AppColors.secondary;
+    return GlassCard(
+      accentColor: accentColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (icon != null) ...[
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(width: 8),
-                ],
-                Text(
-                  title,
-                  style: AppTypography.labelLarge.copyWith(
-                    color: isDark ? Colors.white70 : AppColors.textSecondary,
-                    letterSpacing: 0.8,
-                  ),
+                  child: Icon(icon, size: 16, color: color),
                 ),
+                const SizedBox(width: 8),
               ],
-            ),
-            const SizedBox(height: 10),
-            child,
-          ],
-        ),
+              Text(
+                title,
+                style: AppTypography.labelLarge.copyWith(
+                  color: isDark
+                      ? const Color(0xFFBDBDBD)
+                      : color.withOpacity(0.75),
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
       ),
     );
   }
@@ -92,10 +87,10 @@ class DetailChips extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: (color ?? AppColors.secondary).withOpacity(0.1),
+                color: (color ?? AppColors.secondary).withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: (color ?? AppColors.secondary).withOpacity(0.25),
+                  color: (color ?? AppColors.secondary).withOpacity(0.28),
                 ),
               ),
               child: Text(
@@ -133,7 +128,7 @@ class VitalsGrid extends StatelessWidget {
                 Text(
                   e.value,
                   style: AppTypography.monoMedium.copyWith(
-                    color: isDark ? Colors.white : AppColors.textPrimary,
+                    color: isDark ? const Color(0xFFE0E0E0) : AppColors.textPrimary,
                     fontSize: 14,
                   ),
                 ),

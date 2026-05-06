@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +29,15 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
   Duration _elapsed = Duration.zero;
   InputMode _inputMode = InputMode.audio;
   final _textController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final mode = GoRouterState.of(context).uri.queryParameters['mode'];
+    if (mode == 'text') {
+      setState(() => _inputMode = InputMode.text);
+    }
+  }
 
   @override
   void dispose() {
@@ -63,7 +74,7 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
     if (!mounted) return;
 
     if (bytes != null) {
-      context.go('/processing');
+      context.go('/processing?mode=${_inputMode.name}');
       await ref.read(pipelineProvider.notifier).runPipeline(bytes);
     }
   }
@@ -137,6 +148,7 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
   }
 
   Widget _buildTextInput() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -148,13 +160,15 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
                 maxLines: null,
                 autofocus: true,
                 style: AppTypography.bodyMedium.copyWith(
-                  color: Colors.white,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Enter patient symptoms, complaints, or nurse notes...',
                   hintStyle: AppTypography.bodyMedium.copyWith(
-                    color: Colors.white38,
+                    color: isDark ? Colors.white38 : AppColors.textSecondary.withOpacity(0.6),
                   ),
+                  filled: true,
+                  fillColor: Colors.transparent,
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -189,8 +203,31 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
   void _submitText() {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
-    context.go('/processing');
+    context.go('/processing?mode=text');
     ref.read(pipelineProvider.notifier).runTextPipeline(text);
+  }
+
+  Future<void> _uploadAudioFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.audio,
+        allowMultiple: false,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final fileBytes = result.files.single.bytes;
+      if (fileBytes == null || !mounted) return;
+
+      context.go('/processing?mode=audio');
+      await ref.read(pipelineProvider.notifier).runPipeline(
+        Uint8List.fromList(fileBytes),
+        lang: 'en',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load file: $e')),
+      );
+    }
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -228,6 +265,14 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
   }
 
   Widget _buildLanguageChips() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final chipColors = [
+      AppColors.secondary,
+      AppColors.accentTeal,
+      AppColors.accentCyan,
+      AppColors.accentAmber,
+      AppColors.accentPink,
+    ];
     return SizedBox(
       height: 44,
       child: ListView.separated(
@@ -238,26 +283,35 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
         itemBuilder: (_, i) {
           final lang = AppConstants.supportedLanguages[i];
           final selected = lang == _selectedLanguage;
+          final color = chipColors[i % chipColors.length];
           return GestureDetector(
             onTap: () => setState(() => _selectedLanguage = lang),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: selected
-                    ? AppColors.secondary
-                    : Colors.white.withOpacity(0.12),
+                gradient: selected ? LinearGradient(
+                  colors: [color, color.withOpacity(0.7)],
+                ) : null,
+                color: selected ? null : (isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.04)),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: selected
-                      ? AppColors.secondary
-                      : Colors.white.withOpacity(0.2),
+                      ? color
+                      : (isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.1)),
                 ),
+                boxShadow: selected ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ] : null,
               ),
               child: Text(
                 lang,
                 style: AppTypography.labelMedium.copyWith(
-                  color: Colors.white,
+                  color: selected ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
                   fontWeight:
                       selected ? FontWeight.w600 : FontWeight.w400,
                 ),
@@ -307,7 +361,8 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
               color: Colors.white54,
               size: 28,
             ),
-            onPressed: () {},
+            onPressed: _uploadAudioFile,
+            tooltip: 'Upload audio file',
           ),
           RecordButton(isRecording: isRecording, onTap: _toggleRecording),
           IconButton(
@@ -339,27 +394,36 @@ class _ModeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: active
-              ? AppColors.secondary
-              : Colors.white.withOpacity(0.1),
+          gradient: active ? const LinearGradient(
+            colors: [AppColors.secondary, AppColors.accentTeal],
+          ) : null,
+          color: active ? null : (isDark ? Colors.white.withOpacity(0.1) : AppColors.surfaceLight),
           borderRadius: BorderRadius.circular(12),
+          boxShadow: active ? [
+            BoxShadow(
+              color: AppColors.secondary.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ] : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon,
-                color: active ? Colors.white : Colors.white70, size: 18),
+                color: active ? Colors.white : (isDark ? Colors.white70 : AppColors.textSecondary), size: 18),
             const SizedBox(width: 6),
             Text(
               label,
               style: AppTypography.labelMedium.copyWith(
-                color: active ? Colors.white : Colors.white70,
+                color: active ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
                 fontWeight: active ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
