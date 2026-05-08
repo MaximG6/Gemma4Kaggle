@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceBridge — SATS Benchmark Cases</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red:    #dc2626;
+    --orange: #ea580c;
+    --yellow: #ca8a04;
+    --green:  #16a34a;
+    --blue:   #6b7280;
+    --bg:     #f8fafc;
+    --surface:#ffffff;
+    --border: #e2e8f0;
+    --text:   #1e293b;
+    --muted:  #64748b;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,.1);
+    --thinking-bg: #f0f9ff;
+    --thinking-border: #bae6fd;
+    --thinking-head: #0369a1;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { font-size: 16px; font-weight: 700; flex: 1; }
+  header h1 span { color: var(--muted); font-weight: 400; font-size: 13px; }
+
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+
+  /* ── Accuracy bar ─────────────────────────────────────────────── */
+  #accuracy-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .acc-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .acc-stat .val { font-weight: 700; font-size: 16px; }
+  .acc-stat .val.good { color: var(--green); }
+  .acc-stat .val.bad  { color: var(--red);   }
+  .acc-sep { color: var(--border); }
+
+  /* ── Filter bar ──────────────────────────────────────────────── */
+  #filter-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-label { font-size: 12px; color: var(--muted); margin-right: 4px; }
+  .filter-btn {
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text);
+    transition: all 0.15s;
+  }
+  .filter-btn.active { color: #fff; border-color: transparent; }
+  .filter-btn[data-level="all"].active  { background: var(--text); }
+  .filter-btn[data-level="red"].active  { background: var(--red); }
+  .filter-btn[data-level="orange"].active { background: var(--orange); }
+  .filter-btn[data-level="yellow"].active { background: var(--yellow); }
+  .filter-btn[data-level="green"].active  { background: var(--green); }
+  .filter-btn[data-level="blue"].active   { background: var(--blue); }
+  .filter-btn:hover:not(.active) { background: var(--border); }
+
+  /* ── Main container ──────────────────────────────────────────── */
+  #main {
+    padding: 12px 16px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  #cases-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* ── Case card ───────────────────────────────────────────────── */
+  .case-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .case-card.level-red    { border-left-color: var(--red);    }
+  .case-card.level-orange { border-left-color: var(--orange); }
+  .case-card.level-yellow { border-left-color: var(--yellow); }
+  .case-card.level-green  { border-left-color: var(--green);  }
+  .case-card.level-blue   { border-left-color: var(--blue);   }
+
+  .case-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px 12px;
+    align-items: start;
+    padding: 10px 12px 8px;
+  }
+
+  .case-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 80px;
+  }
+
+  .case-id { font-weight: 700; font-size: 13px; }
+  .lang-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    border: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .expected-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .expected-badge.red    { background: var(--red); }
+  .expected-badge.orange { background: var(--orange); }
+  .expected-badge.yellow { background: var(--yellow); }
+  .expected-badge.green  { background: var(--green); }
+  .expected-badge.blue   { background: var(--blue); }
+
+  .case-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .case-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .case-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .flag-chip {
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    font-size: 11px;
+    color: var(--red);
+    font-weight: 500;
+  }
+  .flag-chip.note {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: var(--green);
+  }
+
+  .case-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    min-width: 120px;
+  }
+
+  /* ── Result area ─────────────────────────────────────────────── */
+  .result-area {
+    padding: 4px 12px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .result-label { font-size: 12px; color: var(--muted); }
+  .result-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  .result-badge.red    { background: var(--red); }
+  .result-badge.orange { background: var(--orange); }
+  .result-badge.yellow { background: var(--yellow); }
+  .result-badge.green  { background: var(--green); }
+  .result-badge.blue   { background: var(--blue); }
+
+  .verdict {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .verdict.correct { background: #f0fdf4; color: var(--green); }
+  .verdict.wrong   { background: #fef2f2; color: var(--red);   }
+
+  .latency-note { font-size: 11px; color: var(--muted); }
+
+  /* ── Thinking dropdown ───────────────────────────────────────── */
+  .thinking-details {
+    border-top: 1px solid var(--border);
+    margin: 0;
+  }
+
+  .thinking-summary {
+    list-style: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--thinking-head);
+    background: var(--thinking-bg);
+    user-select: none;
+    transition: background 0.1s;
+  }
+  .thinking-summary:hover { background: #e0f2fe; }
+  .thinking-summary::marker { display: none; }
+  .thinking-summary::-webkit-details-marker { display: none; }
+
+  .thinking-arrow {
+    display: inline-block;
+    font-size: 10px;
+    transition: transform 0.2s;
+    color: var(--thinking-head);
+  }
+  details[open] .thinking-arrow { transform: rotate(90deg); }
+
+  .thinking-body {
+    padding: 12px;
+    background: var(--thinking-bg);
+    border-top: 1px solid var(--thinking-border);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .thinking-section {
+    margin-bottom: 10px;
+  }
+  .thinking-section:last-child { margin-bottom: 0; }
+  .thinking-section h4 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--thinking-head);
+    margin-bottom: 4px;
+  }
+  .thinking-section p, .thinking-section ul {
+    color: var(--text);
+    margin: 0;
+    padding-left: 0;
+  }
+  .thinking-section ul {
+    padding-left: 16px;
+    list-style: disc;
+  }
+  .thinking-section ul li { margin-bottom: 2px; }
+
+  .raw-output {
+    font-family: monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: 4px;
+    padding: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .vitals-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .vital-chip {
+    padding: 2px 7px;
+    background: #f1f5f9;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .confidence-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .confidence-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .confidence-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+  .confidence-val { font-size: 11px; color: var(--muted); min-width: 35px; text-align: right; }
+
+  /* ── Buttons ─────────────────────────────────────────────────── */
+  .btn {
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary   { background: #2563eb; color: #fff; }
+  .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+  .btn-danger    { background: var(--red); color: #fff; }
+  .btn-run-all   { background: #7c3aed; color: #fff; font-size: 13px; }
+
+  .spinner-inline {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Status message ──────────────────────────────────────────── */
+  #status-msg {
+    text-align: center;
+    padding: 40px 16px;
+    color: var(--muted);
+  }
+  #status-msg.error { color: var(--red); }
+
+  /* ── Progress bar (run all) ─────────────────────────────────── */
+  #run-all-progress {
+    display: none;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  #run-all-progress.visible { display: flex; }
+  #progress-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #progress-fill {
+    height: 100%;
+    background: #7c3aed;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+  }
+  #progress-text { color: var(--muted); font-size: 12px; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>VoiceBridge <span>SATS Benchmark Cases</span></h1>
+  <div class="header-actions">
+    <a href="/dashboard/index.html" class="btn btn-secondary">← Dashboard</a>
+    <button id="btn-run-all" class="btn btn-run-all" onclick="runAll()">▶ Run All Cases</button>
+  </div>
+</header>
+
+<div id="accuracy-bar">
+  <div class="acc-stat">
+    <span class="val" id="acc-correct">—</span>
+    <span>/ <span id="acc-total">—</span> correct</span>
+  </div>
+  <div class="acc-sep">|</div>
+  <div class="acc-stat">
+    Accuracy: <span class="val good" id="acc-pct">—</span>
+  </div>
+  <div class="acc-sep">|</div>
+  <div class="acc-stat">
+    Safe: <span class="val good" id="acc-safe">—</span>
+  </div>
+  <div class="acc-sep">|</div>
+  <div class="acc-stat">
+    Avg latency: <span class="val" id="acc-latency">—</span>
+  </div>
+</div>
+
+<div id="run-all-progress">
+  <div id="progress-bar"><div id="progress-fill" style="width:0%"></div></div>
+  <div id="progress-text">0 / 0</div>
+</div>
+
+<div id="filter-bar">
+  <span class="filter-label">Filter:</span>
+  <button class="filter-btn active" data-level="all"   onclick="setFilter('all')">All</button>
+  <button class="filter-btn"        data-level="red"   onclick="setFilter('red')">RED</button>
+  <button class="filter-btn"        data-level="orange" onclick="setFilter('orange')">ORANGE</button>
+  <button class="filter-btn"        data-level="yellow" onclick="setFilter('yellow')">YELLOW</button>
+  <button class="filter-btn"        data-level="green"  onclick="setFilter('green')">GREEN</button>
+  <button class="filter-btn"        data-level="blue"   onclick="setFilter('blue')">BLUE</button>
+</div>
+
+<div id="main">
+  <div id="cases-list">
+    <div id="status-msg">Loading benchmark cases…</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const API_BASE = "";   // same origin
+let allCases = [];
+let activeFilter = "all";
+let runAllAbort = false;
+
+// ── Accuracy tracking ─────────────────────────────────────────────
+let stats = { ran: 0, correct: 0, safe: 0, latencies: [] };
+
+function updateAccBar() {
+  const { ran, correct, safe, latencies } = stats;
+  document.getElementById("acc-total").textContent   = ran;
+  document.getElementById("acc-correct").textContent = correct;
+  document.getElementById("acc-safe").textContent    = ran > 0 ? safe + "/" + ran : "—";
+  document.getElementById("acc-pct").textContent     = ran > 0 ? Math.round(correct / ran * 100) + "%" : "—";
+  const avgLat = latencies.length > 0
+    ? (latencies.reduce((a, b) => a + b, 0) / latencies.length).toFixed(1) + "s"
+    : "—";
+  document.getElementById("acc-latency").textContent = avgLat;
+}
+
+// ── Level ordering (for safety check) ───────────────────────────
+const LEVEL_ORDER = { blue: 0, green: 1, yellow: 2, orange: 3, red: 4 };
+function isSafe(predicted, expected) {
+  return (LEVEL_ORDER[predicted] || 0) >= (LEVEL_ORDER[expected] || 0);
+}
+
+// ── Fetch and render ─────────────────────────────────────────────
+async function init() {
+  try {
+    const resp = await fetch(API_BASE + "/benchmark-cases");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    allCases = await resp.json();
+    renderCases(allCases);
+  } catch (err) {
+    const el = document.getElementById("status-msg");
+    el.className = "error";
+    el.textContent = "Failed to load benchmark cases: " + err.message;
+  }
+}
+
+function setFilter(level) {
+  activeFilter = level;
+  document.querySelectorAll(".filter-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.level === level);
+  });
+  const filtered = level === "all" ? allCases : allCases.filter(c => c.level === level);
+  renderCases(filtered);
+}
+
+function renderCases(cases) {
+  const list = document.getElementById("cases-list");
+  list.innerHTML = "";
+  if (!cases.length) {
+    list.innerHTML = '<div id="status-msg">No cases match this filter.</div>';
+    return;
+  }
+  cases.forEach(c => list.appendChild(buildCard(c)));
+}
+
+// ── Card builder ─────────────────────────────────────────────────
+function buildCard(c) {
+  const card = document.createElement("div");
+  card.id = "card-" + c.id;
+  card.className = "case-card level-" + c.level;
+  card.dataset.level = c.level;
+
+  // ── Header ──
+  const hdr = document.createElement("div");
+  hdr.className = "case-header";
+
+  // Left: ID + lang
+  const meta = document.createElement("div");
+  meta.className = "case-meta";
+  const idEl = document.createElement("div");
+  idEl.className = "case-id";
+  idEl.textContent = c.id;
+  const langEl = document.createElement("span");
+  langEl.className = "lang-badge";
+  langEl.textContent = c.lang.toUpperCase();
+  const expBadge = document.createElement("span");
+  expBadge.className = "expected-badge " + c.level;
+  expBadge.textContent = c.level.toUpperCase();
+  meta.appendChild(idEl);
+  meta.appendChild(langEl);
+  meta.appendChild(expBadge);
+
+  // Centre: patient text + flags
+  const body = document.createElement("div");
+  body.className = "case-body";
+  const textEl = document.createElement("div");
+  textEl.className = "case-text";
+  textEl.textContent = c.text_en;
+  body.appendChild(textEl);
+
+  if (c.flags && c.flags.length) {
+    const flagsDiv = document.createElement("div");
+    flagsDiv.className = "case-flags";
+    c.flags.forEach(f => {
+      const chip = document.createElement("span");
+      chip.className = "flag-chip";
+      chip.textContent = f;
+      flagsDiv.appendChild(chip);
+    });
+    if (c.note) {
+      const noteChip = document.createElement("span");
+      noteChip.className = "flag-chip note";
+      noteChip.textContent = "💡 " + c.note;
+      flagsDiv.appendChild(noteChip);
+    }
+    body.appendChild(flagsDiv);
+  }
+
+  // Right: Run button
+  const actions = document.createElement("div");
+  actions.className = "case-actions";
+  const runBtn = document.createElement("button");
+  runBtn.className = "btn btn-primary";
+  runBtn.textContent = "Run Model";
+  runBtn.id = "run-" + c.id;
+  runBtn.onclick = () => runCase(c);
+  actions.appendChild(runBtn);
+
+  hdr.appendChild(meta);
+  hdr.appendChild(body);
+  hdr.appendChild(actions);
+  card.appendChild(hdr);
+
+  // ── Result area (hidden until run) ──
+  const resultArea = document.createElement("div");
+  resultArea.className = "result-area";
+  resultArea.id = "result-" + c.id;
+  resultArea.style.display = "none";
+  card.appendChild(resultArea);
+
+  // ── Thinking dropdown (hidden until run) ──
+  const details = document.createElement("details");
+  details.className = "thinking-details";
+  details.id = "thinking-" + c.id;
+  details.style.display = "none";
+
+  const summary = document.createElement("summary");
+  summary.className = "thinking-summary";
+  summary.innerHTML = '<span class="thinking-arrow">▶</span> Model Reasoning';
+  details.appendChild(summary);
+
+  const thinkBody = document.createElement("div");
+  thinkBody.className = "thinking-body";
+  thinkBody.id = "thinking-body-" + c.id;
+  details.appendChild(thinkBody);
+
+  card.appendChild(details);
+  return card;
+}
+
+// ── Run a single case ─────────────────────────────────────────────
+async function runCase(c) {
+  const btn = document.getElementById("run-" + c.id);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-inline"></span>Running…';
+
+  const t0 = Date.now();
+  let triage = null;
+  let error = null;
+
+  try {
+    const resp = await fetch(API_BASE + "/intake/text", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: c.text_en, lang: c.lang }),
+    });
+    if (!resp.ok) {
+      const body = await resp.text();
+      throw new Error("HTTP " + resp.status + ": " + body.slice(0, 200));
+    }
+    const data = await resp.json();
+    triage = data.triage;
+  } catch (err) {
+    error = err.message;
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Re-run";
+
+  showResult(c, triage, error);
+}
+
+function showResult(c, triage, error) {
+  const resultArea = document.getElementById("result-" + c.id);
+  const detailsEl  = document.getElementById("thinking-" + c.id);
+  const thinkBody  = document.getElementById("thinking-body-" + c.id);
+  resultArea.style.display = "";
+  detailsEl.style.display  = "";
+  resultArea.innerHTML = "";
+
+  if (error) {
+    resultArea.innerHTML = `<span style="color:var(--red);font-size:12px;">Error: ${escHtml(error)}</span>`;
+    thinkBody.innerHTML  = `<p style="color:var(--red);">No reasoning available — request failed.</p>`;
+    return;
+  }
+
+  const predicted = (triage.triage_level || "").toLowerCase();
+  const expected  = c.level;
+  const correct   = predicted === expected;
+  const safe      = isSafe(predicted, expected);
+  const latency   = triage.latency_s;
+
+  // Update global stats
+  stats.ran++;
+  if (correct) stats.correct++;
+  if (safe)    stats.safe++;
+  if (latency) stats.latencies.push(latency);
+  updateAccBar();
+
+  // Result row
+  const label = document.createElement("span");
+  label.className = "result-label";
+  label.textContent = "Model:";
+
+  const badge = document.createElement("span");
+  badge.className = "result-badge " + predicted;
+  badge.textContent = predicted.toUpperCase();
+
+  const verdict = document.createElement("span");
+  verdict.className = "verdict " + (correct ? "correct" : "wrong");
+  verdict.textContent = correct ? "✓ Correct" : "✗ Wrong (expected " + expected.toUpperCase() + ")";
+
+  const latEl = document.createElement("span");
+  latEl.className = "latency-note";
+  latEl.textContent = latency ? latency.toFixed(2) + "s" : "";
+
+  if (!safe && !correct) {
+    const unsafeEl = document.createElement("span");
+    unsafeEl.className = "verdict wrong";
+    unsafeEl.textContent = "⚠ UNSAFE (under-triaged)";
+    resultArea.appendChild(label);
+    resultArea.appendChild(badge);
+    resultArea.appendChild(verdict);
+    resultArea.appendChild(unsafeEl);
+    resultArea.appendChild(latEl);
+  } else {
+    resultArea.appendChild(label);
+    resultArea.appendChild(badge);
+    resultArea.appendChild(verdict);
+    resultArea.appendChild(latEl);
+  }
+
+  // Build thinking body
+  buildThinking(thinkBody, c, triage);
+
+  // Auto-open the details on first run
+  document.getElementById("thinking-" + c.id).open = true;
+}
+
+function buildThinking(container, c, t) {
+  container.innerHTML = "";
+
+  // ── 1. Primary complaint ──
+  appendSection(container, "Primary Complaint",
+    `<p>${escHtml(t.primary_complaint || "—")}</p>`);
+
+  // ── 2. Reported Symptoms ──
+  const symptoms = t.reported_symptoms || [];
+  appendSection(container, "Reported Symptoms",
+    symptoms.length
+      ? `<ul>${symptoms.map(s => `<li>${escHtml(s)}</li>`).join("")}</ul>`
+      : "<p>None reported</p>");
+
+  // ── 3. Vital Signs ──
+  const vitals = t.vital_signs_reported || {};
+  const vitalKeys = Object.keys(vitals);
+  if (vitalKeys.length) {
+    const chips = vitalKeys.map(k =>
+      `<span class="vital-chip"><b>${escHtml(k.toUpperCase())}:</b> ${escHtml(String(vitals[k]))}</span>`
+    ).join("");
+    appendSection(container, "Vital Signs Detected",
+      `<div class="vitals-grid">${chips}</div>`);
+  } else {
+    appendSection(container, "Vital Signs Detected", "<p>None stated</p>");
+  }
+
+  // ── 4. Duration ──
+  appendSection(container, "Duration of Symptoms",
+    `<p>${escHtml(t.duration_of_symptoms || "Not recorded")}</p>`);
+
+  // ── 5. Relevant History ──
+  appendSection(container, "Relevant History",
+    `<p>${escHtml(t.relevant_history || "None reported")}</p>`);
+
+  // ── 6. Red Flag Indicators Matched ──
+  const flags = t.red_flag_indicators || [];
+  const expectedFlags = c.flags || [];
+  const matched = flags.filter(f => expectedFlags.some(ef => ef.toLowerCase().includes(f.toLowerCase()) || f.toLowerCase().includes(ef.toLowerCase())));
+  const flagHtml = flags.length
+    ? `<ul>${flags.map(f => `<li style="color:var(--red);font-weight:500;">${escHtml(f)}</li>`).join("")}</ul>`
+    : "<p>None matched</p>";
+  appendSection(container, "Red Flag Indicators", flagHtml);
+
+  // ── 7. SATS Expected Criteria ──
+  appendSection(container, "Expected SATS Criteria",
+    `<p style="color:var(--muted);font-style:italic;">${escHtml(c.note || "—")}</p>` +
+    (expectedFlags.length
+      ? `<ul>${expectedFlags.map(f => `<li>${escHtml(f)}</li>`).join("")}</ul>`
+      : ""));
+
+  // ── 8. Decision ──
+  const predicted = (t.triage_level || "").toUpperCase();
+  const expected  = c.level.toUpperCase();
+  const match = predicted === expected;
+  appendSection(container, "Triage Decision",
+    `<p>Predicted: <b style="color:var(--${t.triage_level})">${predicted}</b> — ` +
+    `Expected: <b>${expected}</b> — ` +
+    `<b style="color:${match ? "var(--green)" : "var(--red)"}">${match ? "✓ Match" : "✗ Mismatch"}</b></p>` +
+    `<p style="margin-top:4px;">${escHtml(t.recommended_action || "")}</p>` +
+    (t.referral_needed ? `<p style="margin-top:4px;color:var(--orange);font-weight:600;">⟳ Referral recommended</p>` : ""));
+
+  // ── 9. Confidence ──
+  const conf = typeof t.confidence_score === "number" ? t.confidence_score : 0;
+  const confPct = Math.round(conf * 100);
+  appendSection(container, "Model Confidence",
+    `<div class="confidence-bar-wrap">
+       <div class="confidence-bar"><div class="confidence-fill" style="width:${confPct}%"></div></div>
+       <span class="confidence-val">${confPct}%</span>
+     </div>`);
+
+  // ── 10. Raw model output ──
+  if (t.raw_model_output) {
+    appendSection(container, "Raw Model Output (Full Generated Text)",
+      `<div class="raw-output">${escHtml(t.raw_model_output)}</div>`);
+  }
+}
+
+function appendSection(container, title, bodyHtml) {
+  const sec = document.createElement("div");
+  sec.className = "thinking-section";
+  sec.innerHTML = `<h4>${title}</h4>${bodyHtml}`;
+  container.appendChild(sec);
+}
+
+// ── Run All ──────────────────────────────────────────────────────
+async function runAll() {
+  const btn = document.getElementById("btn-run-all");
+  const progress = document.getElementById("run-all-progress");
+  const fill = document.getElementById("progress-fill");
+  const text = document.getElementById("progress-text");
+
+  const cases = activeFilter === "all"
+    ? allCases
+    : allCases.filter(c => c.level === activeFilter);
+
+  if (runAllAbort) {
+    runAllAbort = false;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "⏹ Stop";
+  btn.onclick = () => { runAllAbort = true; btn.textContent = "Stopping…"; };
+
+  progress.classList.add("visible");
+  stats = { ran: 0, correct: 0, safe: 0, latencies: [] };
+  updateAccBar();
+
+  for (let i = 0; i < cases.length; i++) {
+    if (runAllAbort) break;
+    fill.style.width = Math.round((i / cases.length) * 100) + "%";
+    text.textContent = `${i} / ${cases.length} — ${cases[i].id}`;
+    await runCase(cases[i]);
+  }
+
+  fill.style.width = "100%";
+  text.textContent = `Done: ${stats.correct} / ${stats.ran} correct`;
+  btn.disabled  = false;
+  btn.textContent = "▶ Run All Cases";
+  btn.onclick = runAll;
+  runAllAbort = false;
+}
+
+// ── Utility ──────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// ── Boot ─────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

@@ -17,6 +17,20 @@ Run:
 
 from __future__ import annotations
 
+import os
+import sys
+
+# Must be set before `from llama_cpp import Llama` executes anywhere in the
+# import chain — ggml_cuda_init runs at that moment and reads this env var.
+# RTX 5090 is device 0, RTX 4090 is device 1; restrict to 4090 only.
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
+# Print Python identity immediately so we can verify the right env is active.
+# The CUDA-enabled llama_cpp will show "CUDA : ARCHS = ..." in its output;
+# a CPU-only build shows only "CPU : ...".  If the wrong build appears, the
+# server was not started from the voicebridge conda env.
+print(f"[VoiceBridge] Python:  {sys.executable}", flush=True)
+
 import io
 import json
 import os
@@ -43,10 +57,20 @@ from pipeline.llama_infer import FINE_GGUF, LANG_NAMES, SYSTEM_PROMPT, run_infer
 from pipeline.pdf_generator import generate_triage_pdf
 from pipeline.triage import TriageClassifier
 
+import llama_cpp as _llama_cpp
+print(f"[VoiceBridge] llama_cpp: {_llama_cpp.__file__}", flush=True)
+print(f"[VoiceBridge] CUDA:      {_llama_cpp.llama_supports_gpu_offload()}", flush=True)
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_EDGE_MODEL_PATH  = str(_REPO_ROOT / "models" / "voicebridge-finetuned-q4km.gguf") if Path(str(_REPO_ROOT / "models" / "voicebridge-finetuned-q4km.gguf")).exists() else "/mnt/host/c/Users/Maxim/.openclaw/workspace/Gemma4Kaggle/voicebridge/models/voicebridge-finetuned-q4km.gguf"
+# Use the same GGUF path that llama_infer already resolved: prefers ~/models/ (native
+# Linux fs) over /mnt/c/ (DrvFS).  DrvFS mmap pages can't be DMA'd to CUDA, so the
+# model silently falls back to CPU unless we load from the native filesystem.
+_EDGE_MODEL_PATH  = FINE_GGUF
 _FULL_MODEL_PATH  = str(_REPO_ROOT / "models" / "voicebridge-merged-v2")
 _FRONTEND_DIR     = _REPO_ROOT / "frontend"
+_DASHBOARD_DIR    = _REPO_ROOT / "dashboard"
+_BENCHMARK_CASES  = _REPO_ROOT / "data" / "benchmark_cases.json"
+print(f"[VoiceBridge] GGUF:      {_EDGE_MODEL_PATH}", flush=True)
 
 _edge_tx: GemmaTranscriber | None = None
 _clf: TriageClassifier | None = None
@@ -85,7 +109,7 @@ def _get_models() -> tuple[GemmaTranscriber, TriageClassifier]:
     return _edge_tx, _clf
 
 
-def _parse_triage_result(raw: str, latency: float, lang: str, raw_transcript: str = "") -> dict[str, Any]:
+def _parse_triage_result(raw: str, latency: float, lang: str, raw_transcript: str = "", include_raw: bool = False) -> dict[str, Any]:
     """Parse full triage JSON from raw model output."""
     clean = re.sub(r'\x1b\[[0-9;]*[mGKHFABCDJKlh]', '', raw)
     clean = re.sub(r'\x1b[()][AB012]', '', clean)
@@ -114,6 +138,7 @@ def _parse_triage_result(raw: str, latency: float, lang: str, raw_transcript: st
         "duration_of_symptoms": "Not recorded",
         "relevant_history": "Not recorded",
         "raw_transcript": raw_transcript,
+        "thinking": clean if include_raw else None,
     }
 
     # Try to extract full JSON
@@ -146,6 +171,9 @@ def _parse_triage_result(raw: str, latency: float, lang: str, raw_transcript: st
 async def lifespan(app: FastAPI):
     init_db()
     print("Models will load on first request (deferred).")
+    # Pre-load language ID model so the first audio request is not blocked
+    from models.language_id import pre_load_lid
+    pre_load_lid()
     yield
 
 
@@ -167,6 +195,9 @@ app.include_router(audio_router)
 
 if _FRONTEND_DIR.exists() and any(_FRONTEND_DIR.iterdir()):
     app.mount("/ui", StaticFiles(directory=str(_FRONTEND_DIR), html=True), name="frontend")
+
+if _DASHBOARD_DIR.exists():
+    app.mount("/dashboard", StaticFiles(directory=str(_DASHBOARD_DIR), html=True), name="dashboard")
 
 
 async def _run_intake(file: UploadFile):
@@ -210,10 +241,10 @@ async def _run_intake(file: UploadFile):
         detected_language=lang or "en",
         duration_s=duration_s,
     )
-    triage = clf.classify(tx_result.english_text, source_lang=lang or "en")
+    triage, raw_thinking = clf.classify(tx_result.english_text, source_lang=lang or "en")
 
     record_id = str(uuid.uuid4())
-    return record_id, triage
+    return record_id, triage, raw_thinking
 
 
 @app.post("/intake/text")
@@ -239,7 +270,7 @@ async def intake_text(request: Request, bg: BackgroundTasks):
         print(f"TEXT INTAKE ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    result = _parse_triage_result(raw, latency, lang, raw_transcript=text)
+    result = _parse_triage_result(raw, latency, lang, raw_transcript=text, include_raw=True)
     record_id = str(uuid.uuid4())
     triage_dict = result
     bg.add_task(save_record, record_id, triage_dict)
@@ -247,87 +278,23 @@ async def intake_text(request: Request, bg: BackgroundTasks):
 
 
 @app.post("/intake/audio")
-async def intake_audio(file: UploadFile, lang: str = "en"):
+async def intake_audio(file: UploadFile, bg: BackgroundTasks):
     """
-    Audio intake: WAV upload → triage JSON via llama-mtmd-cli.
+    Audio intake: upload any audio file → triage JSON.
 
-    Accepts a WAV file, runs multimodal inference on GPU 0, returns
-    triage_level, primary_complaint, red_flag_indicators,
-    recommended_action, confidence_score, latency_s, lang.
+    Accepts WAV, MP3, OGG, FLAC (any format librosa supports).
+    Delegates to the shared _run_intake pipeline.
     """
-    import tempfile
-    import shutil
-
-    if not file.filename or not file.filename.lower().endswith(".wav"):
-        raise HTTPException(status_code=400, detail="Only .wav files are accepted.")
-
-    raw_bytes = await file.read()
-    if not raw_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-
-    # Save to temp WAV
-    tmp_path = Path(tempfile.gettempdir()) / f"vb_audio_{uuid.uuid4().hex}.wav"
-    tmp_path.write_bytes(raw_bytes)
-
     try:
-        lang_name = LANG_NAMES.get(lang, "English")
-        sp = SYSTEM_PROMPT.format(lang_name=lang_name)
-        prompt = (
-            f"<start_of_turn>system\n{sp}<end_of_turn>\n"
-            f"<start_of_turn>user\n<start_of_audio>\n"
-            f"<end_of_audio>\nTriage this patient audio.<end_of_turn>\n"
-            f"<start_of_turn>model\n{{"
-        )
-
-        llama_mtmd = str(Path.home() / "llama.cpp" / "build" / "bin" / "llama-mtmd-cli")
-        if not Path(llama_mtmd).exists():
-            raise FileNotFoundError(f"llama-mtmd-cli not found at {llama_mtmd}")
-
-        t0 = time.time()
-        cmd = [
-            llama_mtmd,
-            "-m", str(Path.home() / "voicebridge-finetuned-q4km.gguf"),
-            "--mmproj", str(Path.home() / "models" / "mmproj-BF16.gguf"),
-            "--audio", str(tmp_path),
-            "-p", prompt,
-            "-n", "1000",
-            "--threads", "4",
-            "--temp", "1.0",
-            "--top-k", "64",
-            "--top-p", "0.95",
-            "-ngl", "99",
-            "--no-warmup",
-            "--jinja",
-        ]
-        env = os.environ.copy()
-        env["CUDA_VISIBLE_DEVICES"] = "0"
-        result_proc = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=600,
-            env=env,
-        )
-        latency = time.time() - t0
-
-        raw_output = result_proc.stdout.decode("utf-8", errors="replace")
-        raw_output = re.sub(r'\x1b\[[0-9;]*[mGKHFABCDJKlh]', '', raw_output)
-        raw_output = re.sub(r'\x1b[()][AB012]', '', raw_output)
-        raw_output = re.sub(r'[\r\x00]', '', raw_output)
-
-        # Transcribe first to capture raw transcript and detected language
-        try:
-            edge_tx_for_transcribe, _ = _get_models()
-            transcript_text = edge_tx_for_transcribe.transcribe_audio(str(tmp_path))
-        except Exception:
-            transcript_text = ""
-
-        triage_out = _parse_triage_result(raw_output, latency, lang, raw_transcript=transcript_text)
-        record_id = str(uuid.uuid4())
-        return {"record_id": record_id, "triage": triage_out}
-
-    finally:
-        tmp_path.unlink(missing_ok=True)
+        record_id, triage, raw_thinking = await _run_intake(file)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    triage_dict = triage.model_dump(mode="json")
+    triage_dict["thinking"] = raw_thinking
+    bg.add_task(save_record, record_id, triage_dict)
+    return {"record_id": record_id, "triage": triage_dict}
 
 
 @app.post("/intake")
@@ -340,17 +307,14 @@ async def intake(file: UploadFile, bg: BackgroundTasks):
     - Persists result to SQLite in the background
     """
     try:
-        record_id, triage = await _run_intake(file)
+        record_id, triage, raw_thinking = await _run_intake(file)
     except Exception as e:
         import traceback
         traceback.print_exc()
         print(f"INTAKE ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     triage_dict = triage.model_dump(mode="json")
-    # Ensure transcript and detected language are in output
-    if 'raw_transcript' not in triage_dict or not triage_dict.get('raw_transcript'):
-        triage_dict['raw_transcript'] = tx_result.original_text
-    triage_dict['source_language'] = tx_result.detected_language
+    triage_dict["thinking"] = raw_thinking
     bg.add_task(save_record, record_id, triage_dict)
     return {"record_id": record_id, "triage": triage_dict}
 
@@ -362,7 +326,7 @@ async def intake_pdf(file: UploadFile):
 
     Returns a PDF file download (application/pdf).
     """
-    _, triage = await _run_intake(file)
+    _, triage, _thinking = await _run_intake(file)
     pdf_bytes = generate_triage_pdf(triage)
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
@@ -386,6 +350,14 @@ def record_detail(record_id: str) -> dict:
     if row is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return row
+
+
+@app.get("/benchmark-cases")
+def benchmark_cases() -> list:
+    """Return the SATS benchmark cases from data/benchmark_cases.json."""
+    if not _BENCHMARK_CASES.exists():
+        raise HTTPException(status_code=404, detail="benchmark_cases.json not found")
+    return json.loads(_BENCHMARK_CASES.read_text(encoding="utf-8"))
 
 
 _ITERATIVE_SYSTEM_PROMPT = """\

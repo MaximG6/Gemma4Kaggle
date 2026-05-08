@@ -6,7 +6,7 @@ import '../models/app_record.dart';
 
 class VoicebridgeApi {
   VoicebridgeApi({String? baseUrl})
-      : _baseUrl = baseUrl ?? 'http://172.24.158.101:8001';
+      : _baseUrl = baseUrl ?? 'http://127.0.0.1:8000';
 
   final String _baseUrl;
 

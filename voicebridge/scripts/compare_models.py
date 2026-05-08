@@ -23,13 +23,23 @@ Usage (from voicebridge/ repo root, conda env voicebridge active):
 
 from __future__ import annotations
 
+import os
+import sys
+
+# GPU routing: set CUDA_VISIBLE_DEVICES in the shell before running.
+# WSL: CUDA_VISIBLE_DEVICES=0 → 4090 (CUDA device 0, cc 8.9)
+# Windows: CUDA_VISIBLE_DEVICES=1 → 4090
+# Do NOT override here — llama_infer.py will set a default if needed.
+
+# Force UTF-8 stdout on Windows
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8")
+
 import argparse
 import json
-import os
 import re
 import statistics
 import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Optional
@@ -192,11 +202,15 @@ class LlamaClassifier:
                   f"({_LEVEL_COLOURS.get(predicted, '')}{predicted}{_RESET}, "
                   f"{latency:.1f}s)")
         else:
-            predicted, latency, raw = run_inference(
+            _, latency, raw = run_inference(
                 self.model_path, case["text_en"], case["lang"], self.dry_run
             )
             if self.dry_run:
                 predicted = case["level"]
+            else:
+                predicted = _parse_triage_level(raw)
+                if predicted is None:
+                    predicted = "green"  # fallback
 
             print(f"\n  ┌─ [{self.label}] {case_id} "
                   f"(expected: {_LEVEL_COLOURS.get(case['level'], '')}"

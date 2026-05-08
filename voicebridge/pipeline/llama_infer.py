@@ -1,5 +1,12 @@
 from __future__ import annotations
 import os
+
+# Restrict to RTX 4090 (physical device 1) before llama_cpp initialises.
+# Must happen before `from llama_cpp import Llama` below.
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "1")
+
+# CUDA ordering on this machine: device 0 = RTX 5090, device 1 = RTX 4090.
+
 import re
 import time
 from pathlib import Path
@@ -10,8 +17,9 @@ from llama_cpp import Llama
 # Resolve model path - check project directory first, then home, then env var
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _MODEL_CANDIDATES = [
-    _REPO_ROOT / "models" / "voicebridge-finetuned-q4km.gguf",  # Project models dir
-    Path.home() / "voicebridge-finetuned-q4km.gguf",  # Home directory fallback
+    Path.home() / "models" / "voicebridge-finetuned-q4km.gguf",  # Native WSL fs (fast)
+    _REPO_ROOT / "models" / "voicebridge-finetuned-q4km.gguf",   # /mnt/c/ fallback (slow)
+    Path.home() / "voicebridge-finetuned-q4km.gguf",
 ]
 FINE_GGUF = os.environ.get("FINE_GGUF")
 if not FINE_GGUF or not Path(FINE_GGUF).exists():
@@ -51,7 +59,9 @@ def _get_model(model_path: Optional[str] = None) -> Llama:
             n_gpu_layers=GPU_LAYERS,
             n_threads=THREADS,
             n_ctx=4096,
-            verbose=False,
+            main_gpu=0,  # only RTX 4090 visible (CUDA_VISIBLE_DEVICES=1)
+            use_mmap=False,  # required for CUDA DMA in WSL2
+            verbose=True,
         )
         _current_model_path = target
     return _model

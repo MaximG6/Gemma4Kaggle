@@ -90915,7 +90915,7 @@ A.y0.prototype={
 F(a){var s=this,r=null,q=s.f,p=A.b([q,A.z(153,q.gi(0)>>>16&255,q.gi(0)>>>8&255,q.gi(0)&255)],t.O),o=A.bt(12),n=A.b([new A.b2(0,B.F,A.z(B.d.aa(76.5),q.gi(0)>>>16&255,q.gi(0)>>>8&255,q.gi(0)&255),B.cN,8)],t.V),m=t.p
 return new A.e1(A.bS(A.b([A.bk(r,A.ds(s.e,B.e,r,20),B.n,r,r,new A.aT(r,r,r,o,n,new A.eh(B.bu,B.cF,B.a0,p,r,r),B.A),r,40,r,r,r,r,40),B.el,A.bF(A.b([A.az(s.d,r,r,r,B.cV.HM(q,18,B.bV),r,r),A.az(s.c,r,r,r,B.am,r,r)],m),B.a5,B.bY,B.p)],m),B.v,B.o,B.cb),B.cp,20,r,q,r)}}
 A.qw.prototype={
-ab(){return new A.Gg(new A.t5("http://172.24.158.101:8001"),new A.rR(B.iB,$.ay()),A.b([],t.m0))}}
+ab(){return new A.Gg(new A.t5("http://localhost:8000"),new A.rR(B.iB,$.ay()),A.b([],t.m0))}}
 A.Gg.prototype={
 m(){var s=this.x
 s.T$=$.ay()
@@ -91695,7 +91695,7 @@ case 3:n.a1(new A.awc(n))
 m=!1
 p=5
 s=8
-return A.O(new A.t5("http://172.24.158.101:8001").AW().m_(0,B.nX),$async$nT)
+return A.O(new A.t5("http://localhost:8000").AW().m_(0,B.nX),$async$nT)
 case 8:m=b
 p=2
 s=7
@@ -91776,7 +91776,7 @@ Vi(a,b){return this.Vl(a,null,b)}}
 A.r2.prototype={
 eg(){var s=0,r=A.M(t.rA),q,p=this,o,n
 var $async$eg=A.H(function(a,b){if(a===1)return A.J(b,r)
-while(true)switch(s){case 0:n=new A.t5("http://172.24.158.101:8001")
+while(true)switch(s){case 0:n=new A.t5("http://localhost:8000")
 n=new A.S5(n)
 p.c=n
 o=p.a
@@ -92007,7 +92007,7 @@ A.om.prototype={
 eg(){return this.yn()},
 yn(){var s=0,r=A.M(t.Bv),q
 var $async$yn=A.H(function(a,b){if(a===1)return A.J(b,r)
-while(true)switch(s){case 0:q=new A.t5("http://172.24.158.101:8001").wY()
+while(true)switch(s){case 0:q=new A.t5("http://localhost:8000").wY()
 s=1
 break
 case 1:return A.K(q,r)}})
@@ -92027,7 +92027,7 @@ A.azX.prototype={
 $2(a,b){return this.Zu(a,b)},
 Zu(a,b){var s=0,r=A.M(t.os),q
 var $async$$2=A.H(function(c,d){if(c===1)return A.J(d,r)
-while(true)switch(s){case 0:q=new A.t5("http://172.24.158.101:8001").wX(b)
+while(true)switch(s){case 0:q=new A.t5("http://localhost:8000").wX(b)
 s=1
 break
 case 1:return A.K(q,r)}})

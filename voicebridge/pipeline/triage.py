@@ -134,7 +134,7 @@ class TriageClassifier:
     def __init__(self, transcriber: "GemmaTranscriber") -> None:
         self._tx = transcriber
 
-    def classify(self, transcript: str, source_lang: str = "en") -> TriageOutput:
+    def classify(self, transcript: str, source_lang: str = "en") -> tuple["TriageOutput", str]:
         """
         Args:
             transcript:  English-language intake text.
@@ -158,7 +158,7 @@ class TriageClassifier:
                 data = json.loads(raw[start : end + 1])
                 data["source_language"] = source_lang
                 data["raw_transcript"] = transcript
-                return TriageOutput(**data)
+                return TriageOutput(**data), raw
             except (json.JSONDecodeError, Exception):
                 pass  # Fall through to key-value parsing
 
@@ -227,4 +227,4 @@ class TriageClassifier:
             if field not in parsed:
                 parsed[field] = default
         
-        return TriageOutput(**parsed)
+        return TriageOutput(**parsed), raw
