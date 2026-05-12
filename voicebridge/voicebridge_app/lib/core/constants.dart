@@ -1,3 +1,5 @@
+import 'dart:html' as html;
+
 class AppConstants {
   AppConstants._();
 
@@ -5,7 +7,7 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   static const String appTagline = 'Offline multilingual clinical intake AI';
 
-  static const String apiBaseUrl = 'http://localhost:8000';
+  static final String apiBaseUrl = html.window.location.origin;
 
   static const int maxRecordingSeconds = 120;
   static const int splashTimeoutSeconds = 30;

@@ -90,7 +90,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
 
   Widget _buildContent(PipelineState state) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

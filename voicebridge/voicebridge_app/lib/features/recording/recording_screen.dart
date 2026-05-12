@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -8,11 +7,7 @@ import '../../core/constants.dart';
 import '../../core/theme/colors.dart';
 import '../../core/theme/glass.dart';
 import '../../core/theme/typography.dart';
-import '../../providers/recording_provider.dart';
 import '../../providers/pipeline_provider.dart';
-import 'widgets/waveform_visualizer.dart';
-import 'widgets/record_button.dart';
-import 'widgets/timer_display.dart';
 
 enum InputMode { audio, text, interactive }
 
@@ -25,65 +20,31 @@ class RecordingScreen extends ConsumerStatefulWidget {
 
 class _RecordingScreenState extends ConsumerState<RecordingScreen> {
   String _selectedLanguage = 'English';
-  Timer? _timer;
-  Duration _elapsed = Duration.zero;
   InputMode _inputMode = InputMode.audio;
   final _textController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     final mode = GoRouterState.of(context).uri.queryParameters['mode'];
-    if (mode == 'text') {
+    if (mode == 'text' && _inputMode != InputMode.text) {
       setState(() => _inputMode = InputMode.text);
     }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     _textController.dispose();
     super.dispose();
   }
 
-  void _toggleRecording() {
-    final recording = ref.read(recordingProvider);
-    if (recording.state == RecordingState.recording) {
-      _stopRecording();
-    } else {
-      _startRecording();
-    }
-  }
-
-  void _startRecording() {
-    ref.read(recordingProvider.notifier).startRecording();
-    _elapsed = Duration.zero;
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _elapsed += const Duration(seconds: 1));
-      ref.read(recordingProvider.notifier).tick(_elapsed);
-
-      if (_elapsed.inSeconds >= AppConstants.maxRecordingSeconds) {
-        _stopRecording();
-      }
-    });
-  }
-
-  Future<void> _stopRecording() async {
-    _timer?.cancel();
-    final bytes = await ref.read(recordingProvider.notifier).stopRecording();
-    if (!mounted) return;
-
-    if (bytes != null) {
-      context.go('/processing?mode=${_inputMode.name}');
-      await ref.read(pipelineProvider.notifier).runPipeline(bytes);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final recording = ref.watch(recordingProvider);
-    final isRecording = recording.state == RecordingState.recording;
-
     return Scaffold(
       body: MeshGradientBackground(
         child: SafeArea(
@@ -96,11 +57,9 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
               ],
               Expanded(
                 child: _inputMode == InputMode.audio
-                    ? _buildWaveformArea(recording, isRecording)
+                    ? _buildUploadArea()
                     : _buildTextInput(),
               ),
-              if (_inputMode == InputMode.audio)
-                _buildBottomControls(isRecording),
               const SizedBox(height: 32),
             ],
           ),
@@ -323,55 +282,55 @@ class _RecordingScreenState extends ConsumerState<RecordingScreen> {
     );
   }
 
-  Widget _buildWaveformArea(RecordingStatus recording, bool isRecording) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        GlassCard(
-          margin: const EdgeInsets.symmetric(horizontal: 24),
-          padding: const EdgeInsets.all(0),
-          child: SizedBox(
-            height: 160,
-            child: WaveformVisualizer(
-              amplitudes: recording.amplitudes,
-              isRecording: isRecording,
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-        TimerDisplay(elapsed: _elapsed),
-        const SizedBox(height: 8),
-        Text(
-          isRecording ? 'Recording...' : 'Tap to start',
-          style: AppTypography.bodySmall.copyWith(color: Colors.white60),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomControls(bool isRecording) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  Widget _buildUploadArea() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          IconButton(
-            icon: const Icon(
-              Icons.upload_file_rounded,
-              color: Colors.white54,
-              size: 28,
+          GlassCard(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.all(48),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.audiotrack_rounded,
+                  color: AppColors.textSecondary,
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Upload Audio File',
+                  style: AppTypography.headlineSmall.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Select an audio recording for triage',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
-            onPressed: _uploadAudioFile,
-            tooltip: 'Upload audio file',
           ),
-          RecordButton(isRecording: isRecording, onTap: _toggleRecording),
-          IconButton(
-            icon: const Icon(
-              Icons.stop_circle_outlined,
-              color: Colors.white54,
-              size: 28,
+          const SizedBox(height: 32),
+          FilledButton.icon(
+            onPressed: _uploadAudioFile,
+            icon: const Icon(Icons.upload_file_rounded),
+            label: const Text('Choose File'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.secondary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              textStyle: AppTypography.labelLarge.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            onPressed: isRecording ? _stopRecording : null,
           ),
         ],
       ),
