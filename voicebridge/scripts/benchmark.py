@@ -109,7 +109,7 @@ def run_accuracy(clf) -> AccuracyResult:
             llm_colour=predicted,
             vital_signs=case["vitals"],
             red_flags=case["flags"],
-            transcript_english=case["text_en"],
+            transcript_english=case["text"],
             language=case["lang"],
         )
         validator_safe.append(val.conflict_direction != "llm_under_triaged")
@@ -209,7 +209,7 @@ class MockTriageClassifier:
         predicted = _MOCK_PREDICTIONS.get(case["id"], "green")
         output = TriageOutput(
             triage_level=predicted,
-            primary_complaint=case["text_en"][:120],
+            primary_complaint=case["text"][:120],
             reported_symptoms=[],
             vital_signs_reported={k: str(v) for k, v in case["vitals"].items()},
             duration_of_symptoms="unknown",
@@ -219,7 +219,7 @@ class MockTriageClassifier:
             referral_needed=predicted in ("red", "orange"),
             confidence_score=0.92,
             source_language=case["lang"],
-            raw_transcript=case["text_en"],
+            raw_transcript=case["text"],
         )
         return output, 0.0
 

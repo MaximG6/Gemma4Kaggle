@@ -32,6 +32,10 @@ models/*/adapter_model.safetensors
 models/*/trainer_state.json
 models/*/pytorch_model.bin
 
+# Keep Python source files in models/
+!models/*.py
+!models/__init__.py
+
 # Data — no real patient data
 data/patients/
 data/*.csv

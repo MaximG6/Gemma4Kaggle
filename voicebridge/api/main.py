@@ -46,7 +46,7 @@ from typing import Any
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.audio_capture import resample_to_16k, router as audio_router
@@ -190,6 +190,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_private_network_header(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 app.include_router(audio_router)
 
@@ -524,3 +530,7 @@ def health() -> dict[str, Any]:
         "models_loaded": _models_loaded,
         "load_error": _load_error,
     }
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/ui")

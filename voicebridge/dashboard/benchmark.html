@@ -571,7 +571,7 @@ function buildCard(c) {
   body.className = "case-body";
   const textEl = document.createElement("div");
   textEl.className = "case-text";
-  textEl.textContent = c.text_en;
+  textEl.textContent = c.text;
   body.appendChild(textEl);
 
   if (c.flags && c.flags.length) {
@@ -648,7 +648,7 @@ async function runCase(c) {
     const resp = await fetch(API_BASE + "/intake/text", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: c.text_en, lang: c.lang }),
+      body: JSON.stringify({ text: c.text, lang: c.lang }),
     });
     if (!resp.ok) {
       const body = await resp.text();

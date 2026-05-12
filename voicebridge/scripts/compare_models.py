@@ -203,7 +203,7 @@ class LlamaClassifier:
                   f"{latency:.1f}s)")
         else:
             _, latency, raw = run_inference(
-                self.model_path, case["text_en"], case["lang"], self.dry_run
+                self.model_path, case["text"], case["lang"], self.dry_run
             )
             if self.dry_run:
                 predicted = case["level"]
@@ -253,7 +253,7 @@ class LlamaClassifier:
 
         output = TriageOutput(
             triage_level         = predicted,
-            primary_complaint    = case["text_en"][:120],
+            primary_complaint    = case["text"][:120],
             reported_symptoms    = [],
             vital_signs_reported = {k: str(v) for k, v in case.get("vitals", {}).items()},
             duration_of_symptoms = "unknown",
@@ -263,7 +263,7 @@ class LlamaClassifier:
             referral_needed      = predicted in ("red", "orange"),
             confidence_score     = 0.0,
             source_language      = case["lang"],
-            raw_transcript       = case["text_en"],
+            raw_transcript       = case["text"],
         )
         return output, latency
 
@@ -545,7 +545,25 @@ def main() -> None:
                         help="Ignore checkpoint, start fresh")
     parser.add_argument("--output-num", type=int, default=None,
                         help="Append _N to output filenames (e.g. --output-num 1 → model_comparison_1.json). Auto-picks next unused if omitted.")
+    parser.add_argument("--print-prompt", action="store_true",
+                        help="Print the system prompt (with lang resolved) and exit")
     args = parser.parse_args()
+
+    if args.print_prompt:
+        from pipeline.llama_infer import SYSTEM_PROMPT, LANG_NAMES
+        case = TEST_CASES[0]
+        system = SYSTEM_PROMPT.format(lang_name=LANG_NAMES.get(case["lang"], "English"))
+        print("=" * 64)
+        print(f"  Prompt as sent to model (case {case['id']}, lang={case['lang']})")
+        print(f"  Source: {(_REPO_ROOT / 'prompts' / 'triage_system.txt').resolve()}")
+        print("=" * 64)
+        print("[SYSTEM]")
+        print(system)
+        print()
+        print("[USER]")
+        print(case["text"])
+        print("=" * 64)
+        return
 
     _GLOBAL_CKPT = {} if args.no_resume else _load_checkpoint()
     base_cache   = _GLOBAL_CKPT.get("base",  {})
