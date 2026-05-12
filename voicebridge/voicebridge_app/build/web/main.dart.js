@@ -90283,7 +90283,7 @@ A.xQ.prototype={
 F(a){var s=this,r=null,q=s.f,p=A.b([q,A.z(153,q.gi(0)>>>16&255,q.gi(0)>>>8&255,q.gi(0)&255)],t.O),o=A.bt(12),n=A.b([new A.b5(0,B.F,A.z(B.d.aa(76.5),q.gi(0)>>>16&255,q.gi(0)>>>8&255,q.gi(0)&255),B.cM,8)],t.V),m=t.p
 return new A.e0(A.bR(A.b([A.br(r,A.dy(s.e,B.e,r,20),B.n,r,r,new A.aW(r,r,r,o,n,new A.es(B.bD,B.cZ,B.a5,p,r,r),B.C),r,40,r,r,r,r,40),B.ej,A.bB(A.b([A.az(s.d,r,r,r,B.cx.Hc(q,18,B.bW),r,r),A.az(s.c,r,r,r,B.aq,r,r)],m),B.a6,B.bZ,B.p)],m),B.u,B.o,B.c_),B.co,20,r,q,r)}}
 A.ql.prototype={
-ac(){return new A.G4(new A.rT("http://127.0.0.1:8000"),new A.rE(B.iC,$.ay()),A.b([],t.m0))}}
+ac(){return new A.G4(new A.rT("https://voicebridge.octo.net"),new A.rE(B.iC,$.ay()),A.b([],t.m0))}}
 A.G4.prototype={
 m(){var s=this.x
 s.T$=$.ay()
@@ -90912,7 +90912,7 @@ case 3:n.a5(new A.avj(n))
 m=!1
 p=5
 s=8
-return A.T(new A.rT("http://127.0.0.1:8000").Au().lR(0,B.nS),$async$nI)
+return A.T(new A.rT("https://voicebridge.octo.net").Au().lR(0,B.nS),$async$nI)
 case 8:m=b
 p=2
 s=7
@@ -90993,7 +90993,7 @@ UG(a,b){return this.UJ(a,null,b)}}
 A.qQ.prototype={
 eT(){var s=0,r=A.S(t.rA),q,p=this,o,n,m
 var $async$eT=A.O(function(a,b){if(a===1)return A.P(b,r)
-while(true)switch(s){case 0:m=new A.rT("http://127.0.0.1:8000")
+while(true)switch(s){case 0:m=new A.rT("https://voicebridge.octo.net")
 m=new A.RL(m)
 p.c=m
 o=p.a
@@ -91100,7 +91100,7 @@ A.o9.prototype={
 eT(){return this.xX()},
 xX(){var s=0,r=A.S(t.Bv),q
 var $async$xX=A.O(function(a,b){if(a===1)return A.P(b,r)
-while(true)switch(s){case 0:q=new A.rT("http://127.0.0.1:8000").wz()
+while(true)switch(s){case 0:q=new A.rT("https://voicebridge.octo.net").wz()
 s=1
 break
 case 1:return A.Q(q,r)}})
@@ -91120,7 +91120,7 @@ A.az1.prototype={
 $2(a,b){return this.YS(a,b)},
 YS(a,b){var s=0,r=A.S(t.os),q
 var $async$$2=A.O(function(c,d){if(c===1)return A.P(d,r)
-while(true)switch(s){case 0:q=new A.rT("http://127.0.0.1:8000").wy(b)
+while(true)switch(s){case 0:q=new A.rT("https://voicebridge.octo.net").wy(b)
 s=1
 break
 case 1:return A.Q(q,r)}})
