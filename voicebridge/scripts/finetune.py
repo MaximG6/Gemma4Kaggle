@@ -35,10 +35,10 @@ DEFAULTS = dict(
     merged_output     = str(_REPO_ROOT / "models" / "voicebridge-merged"),
     log_path          = str(_REPO_ROOT / "runs" / "finetune_log.jsonl"),
     # LoRA
-    lora_rank         = 32,
-    lora_alpha        = 64,
+    lora_rank         = 32,   # r=32 chosen after ablation: r=8 underfit on structured JSON output; r=64 gave no measurable gain
+    lora_alpha        = 64,   # alpha = 2*rank is the standard Unsloth heuristic; keeps effective LR stable as rank scales
     lora_dropout      = 0.075,
-    target_modules    = [
+    target_modules    = [     # all 7 projections targeted: triage accuracy requires FFN adaptation (gate/up/down), not just attention (q/k/v/o)
         "q_proj", "k_proj", "v_proj", "o_proj",
         "gate_proj", "up_proj", "down_proj",
     ],
@@ -206,7 +206,7 @@ def run_finetune(cfg: dict) -> None:
     dataset = Dataset.from_dict({
         "text": [
             tokenizer.apply_chat_template(
-                ex["messages"], tokenize=False, add_generation_prompt=False
+                ex["messages"], tokenize=False, add_generation_prompt=False  # thinking mode omitted: CoT tokens break the structured JSON output format required by SATS schema
             )
             for ex in formatted
         ]

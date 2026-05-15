@@ -16,6 +16,9 @@ reportlab
 # ── Language detection ────────────────────────────────────────────────────
 langdetect
 
+# ── Inference runtime ─────────────────────────────────────────────────────
+llama-cpp-python
+
 # ── ML / model stack ──────────────────────────────────────────────────────
 torch
 transformers
