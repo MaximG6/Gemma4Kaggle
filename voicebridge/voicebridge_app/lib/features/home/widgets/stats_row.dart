@@ -9,13 +9,17 @@ class StatsRow extends StatelessWidget {
     required this.casesToday,
     required this.redCount,
     required this.orangeCount,
-    required this.avgMinutes,
+    required this.yellowCount,
+    required this.greenCount,
+    required this.blueCount,
   });
 
   final int casesToday;
   final int redCount;
   final int orangeCount;
-  final double avgMinutes;
+  final int yellowCount;
+  final int greenCount;
+  final int blueCount;
 
   @override
   Widget build(BuildContext context) {
@@ -32,18 +36,72 @@ class StatsRow extends StatelessWidget {
             color: AppColors.secondary,
           ),
           const SizedBox(width: 12),
-          _StatCard(
-            label: 'RED / ORANGE',
-            value: '$redCount / $orangeCount',
-            icon: Icons.warning_rounded,
-            color: AppColors.triageOrange,
+          _TriageBubble(label: 'RED',    count: redCount,    color: AppColors.triageRed),
+          const SizedBox(width: 8),
+          _TriageBubble(label: 'ORANGE', count: orangeCount, color: AppColors.triageOrange),
+          const SizedBox(width: 8),
+          _TriageBubble(label: 'YELLOW', count: yellowCount, color: AppColors.triageYellow),
+          const SizedBox(width: 8),
+          _TriageBubble(label: 'GREEN',  count: greenCount,  color: AppColors.triageGreen),
+          const SizedBox(width: 8),
+          _TriageBubble(label: 'BLUE',   count: blueCount,   color: AppColors.triageBlue),
+        ],
+      ),
+    );
+  }
+}
+
+class _TriageBubble extends StatelessWidget {
+  const _TriageBubble({
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 58,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color, color.withOpacity(0.75)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.35),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          const SizedBox(width: 12),
-          _StatCard(
-            label: 'Avg Time',
-            value: '${avgMinutes.toStringAsFixed(1)}m',
-            icon: Icons.timer_outlined,
-            color: AppColors.triageGreen,
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            count.toString(),
+            style: AppTypography.headlineSmall.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: AppTypography.labelSmall.copyWith(
+              color: Colors.white.withOpacity(0.85),
+              fontWeight: FontWeight.w700,
+              fontSize: 9,
+              letterSpacing: 0.8,
+            ),
           ),
         ],
       ),

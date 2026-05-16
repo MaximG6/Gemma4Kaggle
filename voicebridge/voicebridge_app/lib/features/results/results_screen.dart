@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -96,14 +97,14 @@ class _ThinkingDropdownState extends State<_ThinkingDropdown>
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(
-                            Icons.psychology_outlined,
+                            Icons.code_rounded,
                             size: 16,
                             color: AppColors.secondary,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'MODEL THINKING',
+                          'RAW JSON',
                           style: AppTypography.labelLarge.copyWith(
                             color: headerTextColor,
                             letterSpacing: 0.8,
@@ -285,10 +286,10 @@ class ResultsScreen extends ConsumerWidget {
           RedFlagsCard(flags: output.redFlagIndicators),
           if (output.redFlagIndicators.isNotEmpty) const SizedBox(height: 12),
           ActionCard(action: output.recommendedAction, level: level),
-          if (output.rawThinking != null && output.rawThinking!.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _ThinkingDropdown(thinking: output.rawThinking!),
-          ],
+          const SizedBox(height: 12),
+          _ThinkingDropdown(
+            thinking: const JsonEncoder.withIndent('  ').convert(output.toJson()),
+          ),
           const SizedBox(height: 12),
           GlassCard(
             child: Row(

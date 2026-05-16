@@ -26,10 +26,11 @@ class HomeScreen extends ConsumerWidget {
             r.createdAt.month == today.month &&
             r.createdAt.day == today.day)
         .length;
-    final redCount =
-        records.where((r) => r.output.triageLevel == 'red').length;
-    final orangeCount =
-        records.where((r) => r.output.triageLevel == 'orange').length;
+    final redCount    = records.where((r) => r.output.triageLevel == 'red').length;
+    final orangeCount = records.where((r) => r.output.triageLevel == 'orange').length;
+    final yellowCount = records.where((r) => r.output.triageLevel == 'yellow').length;
+    final greenCount  = records.where((r) => r.output.triageLevel == 'green').length;
+    final blueCount   = records.where((r) => r.output.triageLevel == 'blue').length;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -42,14 +43,14 @@ class HomeScreen extends ConsumerWidget {
               children: [
                 const SizedBox(height: 20),
                 _buildOfflineBanner(context),
-                const SizedBox(height: 12),
-                _buildLanguageSelector(context, ref),
                 const SizedBox(height: 16),
                 StatsRow(
                   casesToday: casesToday,
                   redCount: redCount,
                   orangeCount: orangeCount,
-                  avgMinutes: 6.2,
+                  yellowCount: yellowCount,
+                  greenCount: greenCount,
+                  blueCount: blueCount,
                 ),
                 const SizedBox(height: 20),
                 _buildModeButtons(context),
@@ -221,7 +222,7 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Running fully offline — no data leaves your device',
+                'Live demo: running on server (GTX 1080) — in practice runs fully offline on-device',
                 style: AppTypography.labelSmall.copyWith(
                   color: AppColors.triageGreen,
                   fontSize: 11,
@@ -341,14 +342,6 @@ class HomeScreen extends ConsumerWidget {
               style: AppTypography.headlineMedium.copyWith(fontSize: 18),
             ),
             const Spacer(),
-            IconButton(
-              icon: const Icon(
-                Icons.settings_outlined,
-                color: AppColors.textSecondary,
-                size: 22,
-              ),
-              onPressed: () => context.go('/settings'),
-            ),
           ],
         ),
       ),

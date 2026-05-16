@@ -10,7 +10,6 @@ import 'features/recording/recording_screen.dart';
 import 'features/processing/processing_screen.dart';
 import 'features/results/results_screen.dart';
 import 'features/history/history_screen.dart';
-import 'features/settings/settings_screen.dart';
 import 'features/interactive/interactive_screen.dart';
 import 'providers/settings_provider.dart';
 
@@ -28,10 +27,6 @@ final _router = GoRouter(
         GoRoute(
           path: '/history',
           builder: (_, __) => const HistoryScreen(),
-        ),
-        GoRoute(
-          path: '/settings',
-          builder: (_, __) => const SettingsScreen(),
         ),
         GoRoute(
           path: '/case/:id',
@@ -88,7 +83,6 @@ class _ShellState extends State<_Shell> {
   static const _destinations = [
     ('/home', Icons.home_outlined, Icons.home_rounded, 'Home'),
     ('/history', Icons.history_outlined, Icons.history_rounded, 'History'),
-    ('/settings', Icons.settings_outlined, Icons.settings_rounded, 'Settings'),
   ];
 
   int _getIndex(String path) {

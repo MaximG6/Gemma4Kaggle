@@ -24,6 +24,12 @@ class _InteractiveScreenState extends ConsumerState<InteractiveScreen> {
   int _turnCount = 0;
   static const _maxTurns = 6;
 
+  static const _starters = [
+    'Chest pain',
+    'Child fever',
+    'Numb sensation in hands and feet',
+  ];
+
   // Chat messages: {role: 'model'|'user', content: '...'}
   final List<Map<String, String>> _messages = [];
 
@@ -166,29 +172,106 @@ class _InteractiveScreenState extends ConsumerState<InteractiveScreen> {
   Widget _buildChatArea(bool isDark) {
     if (_messages.isEmpty && !_loading) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline_rounded,
-              size: 64,
-              color: isDark ? Colors.white24 : Colors.black26,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Describe the patient symptoms',
-              style: AppTypography.bodyLarge.copyWith(
-                color: isDark ? Colors.white60 : Colors.black54,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 64,
+                color: isDark ? Colors.white24 : Colors.black26,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'The AI will ask follow-up questions',
-              style: AppTypography.bodySmall.copyWith(
-                color: isDark ? Colors.white.withOpacity(0.4) : Colors.black38,
+              const SizedBox(height: 16),
+              Text(
+                'Describe the patient symptoms',
+                style: AppTypography.bodyLarge.copyWith(
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'The AI will ask follow-up questions',
+                style: AppTypography.bodySmall.copyWith(
+                  color: isDark ? Colors.white.withOpacity(0.4) : Colors.black38,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(child: Divider(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                    thickness: 1,
+                  )),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      'try starting with',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: isDark ? Colors.white38 : Colors.black38,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                    thickness: 1,
+                  )),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Column(
+                children: _starters.map((s) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: GestureDetector(
+                    onTap: () {
+                      _controller.text = s;
+                      _send();
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.06)
+                            : AppColors.secondary.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withOpacity(0.12)
+                              : AppColors.secondary.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 14,
+                            color: isDark ? Colors.white38 : AppColors.secondary.withOpacity(0.6),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              s,
+                              style: AppTypography.bodySmall.copyWith(
+                                color: isDark ? Colors.white70 : AppColors.textPrimary,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 12,
+                            color: isDark ? Colors.white24 : Colors.black26,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )).toList(),
+              ),
+            ],
+          ),
         ),
       );
     }

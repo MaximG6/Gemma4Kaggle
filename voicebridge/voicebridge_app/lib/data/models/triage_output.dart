@@ -71,8 +71,6 @@ class TriageOutput {
       'referral_needed': referralNeeded,
       'confidence_score': confidenceScore,
       'source_language': sourceLanguage,
-      'raw_transcript': rawTranscript,
-      if (rawThinking != null) 'thinking': rawThinking,
     };
   }
 
