@@ -99,6 +99,17 @@ To rebuild from source: `flutter build web --release --base-href "/ui/"`
 
 Medic (medic.org), stewards of the Community Health Toolkit deployed to 100,000+ health workers across 15+ countries, reached out after seeing VoiceBridge. Their team expressed interest in building an Android APK connecting to CHT via VoiceBridge's structured JSON output and asked us to prioritise Swahili and Bengali.
 
+## Benchmark Methodology
+
+The 100-case benchmark dataset was curated from SATS 2023 and WHO ETAT 
+clinical scenarios. English source cases were translated into Swahili, 
+Bengali, Hausa, and Tagalog for multilingual evaluation. Labels are the 
+expected SATS triage level based on clinical discriminators and vital sign 
+thresholds defined in the SATS 2023 specification. All inference was run 
+via llama.cpp on an RTX 5090 with full GPU offload (-ngl 99). Benchmark 
+script is at voicebridge/scripts/compare_models.py. Results are logged 
+to voicebridge/docs/final_benchmark.json.
+
 ## License
 
 Apache 2.0
